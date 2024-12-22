@@ -226,7 +226,7 @@ inline u_int8_t notifyModule(uint16_t destModuleIndex, uint16_t srcModuleIndex, 
     return xTaskNotify(moduleList[destModuleIndex].handle, NOTIFY_MSG(sharedRessourceBits, srcModuleIndex), action);
 }
 /**
- * @brief Notifie tous les modules intéressés par une ressource partagée.
+ * @brief Notifie tous les modules intéressés par une ressource partagée. Note : ne notifie pas les Monitor
  *
  * @param srcModuleIndex Index du module source.
  * @param sharedRessourceBits Bits de la ressource partagée.
@@ -238,7 +238,7 @@ inline u_int8_t notifyAll(uint16_t srcModuleIndex, uint32_t sharedRessourceBits,
 {
     u_int8_t success = pdFALSE;
     xSemaphoreTake(xMutex_NotifyAll, portMAX_DELAY); // TODO: if ? in ISR ? Atomic ?
-    for (Module *m = moduleList; m->handle != NULL; m++)
+    for (Module *m = moduleList; m->handle != NULL || ARRAY_INDEX_FROM_PTR(moduleList,m) < MAX_MODULES; m++) // TODO : optimise
     {
         if (m->ressourceOfInterest & sharedRessourceBits)
         {

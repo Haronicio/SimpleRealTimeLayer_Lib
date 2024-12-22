@@ -1,5 +1,5 @@
 
-#define C_ONLY
+// #define C_ONLY
 
 #ifdef C_ONLY
 #include "core.h"

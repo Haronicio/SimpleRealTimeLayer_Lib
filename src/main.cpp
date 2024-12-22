@@ -1,6 +1,3 @@
-#define C_ONLY
-
-
 #include <Arduino.h>
 #include <srtl.h>
 

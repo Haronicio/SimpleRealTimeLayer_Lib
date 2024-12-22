@@ -102,7 +102,7 @@ public: //TODO getter and setter
         uint8_t success = pdFALSE;
         xSemaphoreTake(this->xMutex_NotifyAll, portMAX_DELAY);
 
-        for (Module *m = this->moduleList; m->handle != nullptr; ++m)
+        for (Module *m = this->moduleList; m->handle != nullptr || ARRAY_INDEX_FROM_PTR(moduleList,m) < MAX_MODULES; m++) // TODO : optimise
         {
             if (m->ressourceOfInterest & sharedRessourceBits)
             {
