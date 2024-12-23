@@ -11,7 +11,7 @@ SRTL aims to simplify the development of concurrent systems by allowing multiple
 ## Features
 
 - **CORE**: Provides basic task management, resource sharing, and synchronization. It allows easy creation of tasks and communication through shared resources.
-- **IHM**: Easily create secure IN/OUT for interracting with the final users
+- **IHM**: Easily create secure peripheral IN/OUT for interracting with the final users
 - **Modular System**: The system is designed to be highly modular, enabling the development of complex embedded systems with minimal overhead and no interraction with other library.
 - **Inter-Task Communication**: Tasks can notify each other and synchronize through semaphores and notifications.
 - **Task Prioritization**: Dynamically adjust task priorities based on resource contention, ensuring fair execution.
@@ -56,21 +56,28 @@ Once the project is set up, use PlatformIO to build and upload the code to your 
 The current implementation focuses on the **CORE** and **IHM** module, which allows the creation of tasks and communication through shared resources with synchronization, and create simple interface called Monitor and Controller to make app interactive. The minimal version of the **CORE** module is functional, and various implementations can be built using it. I need to further test **IHM**.
 
 ### Key milestones:
+
+✅ Accomplish 📝 Working in progress ⌛ Pending
+
 1. **CORE Module**: 
    - ✅ Full support for creating tasks and managing shared resources with synchronization.
    - ✅ Current version is fully functional, with task creation, resource sharing, and notification systems in place. In theory, this feature can be used to set up virtually any concurrency system possible 
    - 📝 Refine semaphore and notification mechanisms for more intuitive use.
+   - 📝 Scheduler synchronized with NTP or internal time
    - ⌛  Currently Support 16 modules and 16 shared resources, want to up to 32 each
 
 2. **IHM (Special Modules)**: 
-   - ⌛  Introduce user interface modules that will allow interaction with physical devices such as buttons and screens. FSM for behavior and ISR for triggering. Controller manage two type of input, digital (with ISR) and analog (with timer),Monitor is just a special case of Module.
+   - ✅  Introduce user interface modules that will allow interaction with physical devices such as buttons and screens. FSM for behavior and ISR for triggering. Controller manage two type of input, digital (with ISR) and analog (with timer),Monitor is just a special case of Module.
+   - 📝 
 
 3. **SYNC (Storage and Communication)**: 
-   - ⌛ No work has been done yet on the synchronization of storage or communication. Future plans include developing this part to allow simplify communication of shared resource via BLE and some external network protocols (such as MQTT), either via local storage.
+   - ⌛ No work has been done yet on the synchronization of storage or communication. Future plans include developing this part to simplify communication of shared resource via BLE and some external network protocols (such as MQTT), either via local storage.
 
 4. **Advanced Features**:
    - ⌛ Many templates of concurrency pattern and use cases
    - ⌛ Future versions will introduce advanced features such as multi-resource transactions, priority management, and enhanced UI capabilities.
+   - ⌛ SIMPLIFY USES AT THE MAXIMUM
+   - **UTIL** in lib for *error.h* (builtin led blink in function of error)
 
 ---
 
