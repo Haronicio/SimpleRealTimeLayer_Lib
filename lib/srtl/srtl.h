@@ -2,8 +2,8 @@
 #define SRTL_H
 
 #include "core/core.h"
+#include "ihm/ihm.h"
 
-#include "srtl.h"
 
 // #ifdef __cplusplus
 // extern "C" {

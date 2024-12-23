@@ -13,7 +13,7 @@ SemaphoreHandle_t xMutex_NotifyAll;
 void *sharedRessources[MAX_SHARED_RESOURCES];   // Liste des ressources partagées
 uint8_t nSharedResource;  
 
-#endif // DEBUG
+#endif // C_ONLY
 
 
 

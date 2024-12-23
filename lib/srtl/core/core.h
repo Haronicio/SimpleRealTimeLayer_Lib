@@ -28,7 +28,8 @@
 #include <freertos/task.h>
 #include <freertos/semphr.h>
 
-#include "../srtl.h"
+// #include "../srtl.h"
+struct SRTL;
 
 // Configuration de base
 
@@ -238,7 +239,8 @@ inline u_int8_t notifyAll(uint16_t srcModuleIndex, uint32_t sharedRessourceBits,
 {
     u_int8_t success = pdFALSE;
     xSemaphoreTake(xMutex_NotifyAll, portMAX_DELAY); // TODO: if ? in ISR ? Atomic ?
-    for (Module *m = moduleList; m->handle != NULL || ARRAY_INDEX_FROM_PTR(moduleList,m) < MAX_MODULES; m++) // TODO : optimise
+    for (Module *m = moduleList; (m->handle != NULL) && (m < &moduleList[MAX_MODULES]); m++)
+    // for (Module *m = moduleList; m->handle != NULL; m++)
     {
         if (m->ressourceOfInterest & sharedRessourceBits)
         {
