@@ -13,6 +13,8 @@ SemaphoreHandle_t xMutex_NotifyAll;
 void *sharedRessources[MAX_SHARED_RESOURCES];   // Liste des ressources partagées
 uint8_t nSharedResource;  
 
+SemaphoreHandle_t xMutex_JoinList; // Mutex pour protéger les barrières
+uint16_t joinList[MAX_JOIN_LIST] = {0};
 #endif // C_ONLY
 
 

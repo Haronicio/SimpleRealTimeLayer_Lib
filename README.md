@@ -68,7 +68,7 @@ The current implementation focuses on the **CORE** and **IHM** module, which all
 
 2. **IHM (Special Modules)**: 
    - ✅  Introduce user interface modules that will allow interaction with physical devices such as buttons and screens. FSM for behavior and ISR for triggering. Controller manage two type of input, digital (with ISR) and analog (with timer),Monitor is just a special case of Module.
-   - 📝 
+   - 📝 turn to CPP all this odd shit
 
 3. **SYNC (Storage and Communication)**: 
    - ⌛ No work has been done yet on the synchronization of storage or communication. Future plans include developing this part to simplify communication of shared resource via BLE and some external network protocols (such as MQTT), either via local storage.

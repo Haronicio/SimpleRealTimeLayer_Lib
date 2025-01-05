@@ -15,6 +15,9 @@ class SRTL
 {
 // private:
 public: //TODO getter and setter
+
+    // CORE
+
     uint8_t nModule;
     Module moduleList[MAX_MODULES];
     SemaphoreHandle_t xMutex_NotifyAll;
@@ -22,12 +25,23 @@ public: //TODO getter and setter
     void * sharedRessources[MAX_SHARED_RESOURCES];
     uint8_t nSharedResource;
 
+    uint32_t joinList[MAX_JOIN_LIST] = {0}; // TODO : add more module (use uint32_t but due to splitting 32 bit to Module and SharedResource ... see NOTIFY_MSG uses)
+    SemaphoreHandle_t xMutex_JoinList;
+
+    // IHM
+
+    Monitor sysMonitor;
+
+    uint8_t nController;
+    Controller controllerList[MAX_CONTROLLER];
+
 // public:
     // Constructeur
     SRTL()
     {
         nModule = 0;
         nSharedResource = 0;
+        nController = 0;
         this->init();
     }
 
@@ -57,8 +71,11 @@ public: //TODO getter and setter
     // Initialisation
     SemaphoreHandle_t init()
     {
+        xMutex_JoinList = xSemaphoreCreateMutex();
         return xMutex_NotifyAll = xSemaphoreCreateMutex();
     }
+
+    // CORE
 
     // Gestion des modules
     inline uint8_t registerModule(TaskFunction_t taskFunction, const char *name, uint32_t stackSize, uint8_t priority,
@@ -113,6 +130,89 @@ public: //TODO getter and setter
         xSemaphoreGive(this->xMutex_NotifyAll);
         return success;
     }
+
+
+    // IHM
+
+    inline void registerMonitor(TaskFunction_t taskFunction, const char *name, uint32_t stackSize, uint8_t priority,
+                                    uint32_t taskFrequency,
+                                    void *monitorparameters)
+    {
+        createModule(taskFunction, name, stackSize, monitorparameters, priority, 0xFFFF, taskFrequency, &(this->sysMonitor));
+    }
+
+    inline u_int8_t notifyMonitor(uint16_t srcModuleIndex, uint32_t sharedRessourceBits, eNotifyAction action)
+    {
+        return xTaskNotify(this->sysMonitor.handle, NOTIFY_MSG(sharedRessourceBits, srcModuleIndex), action);
+    }
+
+    inline uint8_t registerController(void (*digitalHandler)(void*), PinControllerParam digitalPins[],
+                                            TimerCallbackFunction_t analogHandler, PinControllerParam analogPins[], uint8_t analogT, void *parameters
+                                            /*,uint8_t analogRes,uint8_t analogRef*/)
+    {
+
+        if (this->nController >= MAX_CONTROLLER)
+        {
+            // Serial.println("Error: No space left in controller array");
+            while (1)
+                ;
+        }
+        createController(digitalHandler, digitalPins, analogHandler, analogPins, analogT, parameters, &(this->controllerList[nController]));
+        return this->nController++;
+    }
+
+
+// WARNING : Only handle can wait itself at a barrier using introspection
+
+// Barriere join from a handler (No FRTOS thread pause) Awaiting release
+// Bloc executing handler into this function, set the module idx into the specified joinList of awaiting module
+// Return Released Modules
+inline uint32_t join(uint8_t joinListIndex,uint8_t modulePtrIndex){
+    xSemaphoreTake(xMutex_JoinList, portMAX_DELAY);
+
+    joinList[joinListIndex] |= (1 << modulePtrIndex);
+
+    xSemaphoreGive(xMutex_JoinList);
+
+    uint32_t ret = 0;
+    xTaskNotifyWait(0x0,0x0,&ret,portMAX_DELAY);
+
+    return ret;
+}
+
+// Release Module blocked at the Barrier, use with join
+// Clear the bit field
+// Return Released Modules
+inline uint32_t release(uint8_t joinListIndex){
+
+    uint32_t releasedModule = joinList[joinListIndex];
+    
+    uint8_t i = 0;
+
+    xSemaphoreTake(xMutex_JoinList, portMAX_DELAY);
+    while (i < MAX_MODULES)
+    {
+        if(releasedModule << i) xTaskNotify(this->moduleList[i].handle,releasedModule,eNoAction);
+        i++;
+    }
+    joinList[joinListIndex] = 0;
+    xSemaphoreGive(xMutex_JoinList);
+    
+    return releasedModule;
+}
+
+// specific case of release when free a specific module from the barrier
+inline uint32_t unjoin(uint8_t joinListIndex,uint8_t modulePtrIndex){
+    xSemaphoreTake(xMutex_JoinList, portMAX_DELAY);
+
+    joinList[joinListIndex] &= (0 << modulePtrIndex);
+
+    xSemaphoreGive(xMutex_JoinList);
+
+    uint32_t ret = 0;
+    xTaskNotify(this->moduleList[modulePtrIndex].handle,ret,eNoAction);
+    return ret;
+}
 
 
 };

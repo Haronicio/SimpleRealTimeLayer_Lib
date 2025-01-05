@@ -9,6 +9,7 @@
 #define MAX_CONTROLLER 4 // 8 ?
 #define MAX_DIGITALPIN_IN_CONTROLLER 16
 #define MAX_ANALOGPIN_IN_CONTROLLER 8
+// TODO : More monitor
 
 // Monitor have an identical struct as Module
 typedef Module Monitor;
@@ -87,7 +88,7 @@ static inline void createController(void (*digitalHandler)(void*), PinController
     controller->parameters = parameters;
 }
 
-// #ifdef C_ONLY
+#ifdef C_ONLY
 
 extern Monitor sysMonitor;
 
@@ -121,6 +122,6 @@ static inline uint8_t registerController(void (*digitalHandler)(void*), PinContr
     return nController++;
 }
 
-// #endif //C_ONLY
+#endif //C_ONLY
 
 #endif // SRTL_IHM_H

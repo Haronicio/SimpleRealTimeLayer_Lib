@@ -36,10 +36,12 @@ struct SRTL;
 #define MAX_MODULES 16          // Nombre maximum de modules
 #define MAX_SHARED_RESOURCES 16 // Nombre maximum de ressources partagées
 #define N_FREE_BITS 0           // Nombre de bits libres pour des utilisations personnalisées
+#define MAX_JOIN_LIST 4         // Nombre maximum de file d'attente pour les barrières
 
 #define NBITS_SRC MAX_MODULES          // Nombre de bits pour coder les modules dans une notification
 #define NBITS_WHO MAX_SHARED_RESOURCES // Nombre de bits pour coder les ressources partagées dans une notification
 #define NBITS_FREE N_FREE_BITS         // Nombre de bits libres pour des notifications personnalisées
+
 
 #define MINIMAL_STACK_SIZE 2048 // Taille minimale de la pile pour les tâches
 
@@ -72,6 +74,13 @@ struct SRTL;
 
 // MACRO Divers
 #define ARRAY_INDEX_FROM_PTR(array, element_ptr) ((element_ptr) - (&array[0]))
+
+// MACRO INSIDE MODULE HANDLER
+
+#define GET_SRTL_INSTANCE ((*((Module *)modulePtr)->parent))
+#define GET_PARAMS_INSTANCE(type)  (*(type*)(((Module *)modulePtr)->parameters))
+#define GET_CURRENT_MODULE_INSTANCE (*((Module *)modulePtr))
+#define GET_CURRENT_MODULE_INDEX (ARRAY_INDEX_FROM_PTR(GET_SRTL_INSTANCE.moduleList, (Module *)modulePtr))
 
 // #ifdef __cplusplus
 // extern "C" {
@@ -259,6 +268,59 @@ inline SemaphoreHandle_t SRTLinit()
 {
     return xMutex_NotifyAll = xSemaphoreCreateMutex();
 }
+
+
+// JOIN LIST : pseudo barrier for intermodule sync
+// TODO : add more module (use uint32_t but due to splitting 32 bit to Module and SharedResource ... see NOTIFY_MSG uses)
+
+// extern uint16_t joinList[MAX_JOIN_LIST];
+extern SemaphoreHandle_t xMutex_JoinList = xSemaphoreCreateMutex();
+extern uint32_t joinList[MAX_JOIN_LIST] = {0};
+
+// Barriere join from a handler (No FRTOS thread pause) Awaiting release
+// Bloc executing handler into this function, set the module idx into the specified joinList of awaiting module
+// Return Released Modules
+inline uint32_t join(uint8_t joinListIndex,uint8_t modulePtrIndex){
+    xSemaphoreTake(xMutex_JoinList, portMAX_DELAY);
+
+    joinList[joinListIndex] |= (1 << modulePtrIndex);
+
+    xSemaphoreGive(xMutex_JoinList);
+
+    uint32_t ret;
+    xTaskNotifyWait(0x0,0x0,&ret,portMAX_DELAY);
+
+    return ret;
+}
+
+// Release Module blocked at the Barrier, use with join
+// Return Released Modules
+inline uint32_t release(uint8_t joinListIndex){
+
+    uint32_t releasedModule = joinList[joinListIndex];
+    
+    uint8_t i = 0;
+
+    xSemaphoreTake(xMutex_JoinList, portMAX_DELAY);
+    while (i < MAX_MODULES)
+    {
+        if(releasedModule << i) xTaskNotify(moduleList[i].handle,releasedModule,eNoAction);
+        i++;
+    }
+    joinList[joinListIndex] = 0;
+    xSemaphoreGive(xMutex_JoinList);
+    
+    return releasedModule;
+}
+
+
+
+
+
 #endif
+
+
+
+
 
 #endif // SRTL_CORE_H
