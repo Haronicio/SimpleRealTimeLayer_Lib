@@ -61,23 +61,27 @@ The current implementation focuses on the **CORE** and **IHM** module, which all
 
 1. **CORE Module**: 
    - ✅ Full support for creating tasks and managing shared resources with synchronization.
-   - ✅ Current version is fully functional, with task creation, resource sharing, and notification systems in place. In theory, this feature can be used to set up virtually any concurrency system possible 
+   - ✅ Current version is fully functional, with task creation, resource sharing, and notification systems in place. In theory, this feature can be used to set up virtually any concurrency system possible
+   - ✅ Create a Barrier system called (un)join and release
    - 📝 Refine semaphore and notification mechanisms for more intuitive use.
+   - 📝 Implement free waiting (condition variable) https://en.wikipedia.org/wiki/Monitor_(synchronization) to reduce starvation
    - 📝 Scheduler synchronized with NTP or internal time
    - ⌛  Currently Support 16 modules and 16 shared resources, want to up to 32 each
 
 2. **IHM (Special Modules)**: 
    - ✅  Introduce user interface modules that will allow interaction with physical devices such as buttons and screens. FSM for behavior and ISR for triggering. Controller manage two type of input, digital (with ISR) and analog (with timer),Monitor is just a special case of Module.
-   - 📝 turn to CPP all this odd shit
+   - ✅ turn to CPP all this odd shit
 
 3. **SYNC (Storage and Communication)**: 
    - ⌛ No work has been done yet on the synchronization of storage or communication. Future plans include developing this part to simplify communication of shared resource via BLE and some external network protocols (such as MQTT), either via local storage.
 
 4. **Advanced Features**:
-   - ⌛ Many templates of concurrency pattern and use cases
+   - ⌛ Make unit test
+   - ⌛ Many templates of concurrency pattern (https://en.wikipedia.org/wiki/Concurrency_pattern) and use cases
    - ⌛ Future versions will introduce advanced features such as multi-resource transactions, priority management, and enhanced UI capabilities.
    - ⌛ SIMPLIFY USES AT THE MAXIMUM
-   - **UTIL** in lib for *error.h* (builtin led blink in function of error)
+   - **UTIL** in lib for *error.h* (exemple builtin led blink in function of error)
+   - **UTIL** in lib for *debug.h*
 
 ---
 

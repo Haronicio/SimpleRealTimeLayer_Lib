@@ -28,7 +28,6 @@
 #include <freertos/task.h>
 #include <freertos/semphr.h>
 
-// #include "../srtl.h"
 struct SRTL;
 
 // Configuration de base
@@ -69,11 +68,19 @@ struct SRTL;
 #define EXTRACT_SHARED_RESOURCE(notificationValue) \
     ((notificationValue) & ((1 << NBITS_WHO) - 1))
 
+#define EXTRACT_JOIN_LIST_QUEUE(notificationValue) \
+    ((notificationValue) & ((1 << NBITS_WHO) - 1))
+
 #define EXTRACT_SOURCE_MODULE(notificationValue) \
     (((notificationValue) >> NBITS_WHO) & ((1 << NBITS_SRC) - 1))
 
 // MACRO Divers
 #define ARRAY_INDEX_FROM_PTR(array, element_ptr) ((element_ptr) - (&array[0]))
+
+char binaryBuffer[33];
+#define TO_BIN(value) (itoa(value, binaryBuffer, 2))
+
+#define INDEX_TO_BITSET(index) ((1 << index))
 
 // MACRO INSIDE MODULE HANDLER
 

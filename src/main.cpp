@@ -6,6 +6,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
+
 #ifdef C_ONLY
 // DEBUG
 
@@ -257,7 +258,6 @@ void consummer31(void *modulePtr)
 	currentModule.notificationValue = 0;
 	float local_var1 = 0.0, local_var2 = 0.0;
 
-
 	xTaskNotifyWait(0, 0, &vardata.ivar, portMAX_DELAY);
 	// Task implementation
 	for (;;)
@@ -415,7 +415,7 @@ struct cube_custom_data_t
 
 	int cubeEdges[12][2] = {
 		{0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6}, {6, 7}, {7, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7}};
-		
+
 } cubeVar;
 
 // not used for know
@@ -439,15 +439,15 @@ inline void rotateVertex(float vertex[3], float out[3])
 	float z = vertex[2];
 
 	float cosX = cos(cubeVar.angleX);
-    float sinX = sin(cubeVar.angleX);
-    float cosY = cos(cubeVar.angleY);
-    float sinY = sin(cubeVar.angleY);
-    float cosZ = cos(cubeVar.angleZ);
-    float sinZ = sin(cubeVar.angleZ);
+	float sinX = sin(cubeVar.angleX);
+	float cosY = cos(cubeVar.angleY);
+	float sinY = sin(cubeVar.angleY);
+	float cosZ = cos(cubeVar.angleZ);
+	float sinZ = sin(cubeVar.angleZ);
 
 	// Rotation around X axis
 	float tempY = y * cosX - z * sinX;
-	float tempZ = y *sinX + z * cosX;
+	float tempZ = y * sinX + z * cosX;
 	y = tempY;
 	z = tempZ;
 
@@ -478,8 +478,9 @@ inline void projectVertex(float vertex[3], int &screenX, int &screenY)
 	screenY = centerY - (int)(vertex[1] * perspectiveFactor * scale);
 }
 
-inline float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
-    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+inline float mapFloat(float x, float in_min, float in_max, float out_min, float out_max)
+{
+	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
 void cubeTask(void *modulePtr)
@@ -505,8 +506,8 @@ void cubeTask(void *modulePtr)
 		// Increment rotation angles depending on controller 0 (joystick)
 		if (xSemaphoreTake(xMutex_CubeVar, portMAX_DELAY) == pdTRUE)
 		{
-			cubeVar.angleX = mapFloat(controllerList[0].analogPinStates[0], 0, 4095, -PI/2, PI/2) * cubeVar.rotationSpeed;
-			cubeVar.angleY = mapFloat(controllerList[0].analogPinStates[1], 0, 4095, PI/2, -PI/2) * cubeVar.rotationSpeed;
+			cubeVar.angleX = mapFloat(controllerList[0].analogPinStates[0], 0, 4095, -PI / 2, PI / 2) * cubeVar.rotationSpeed;
+			cubeVar.angleY = mapFloat(controllerList[0].analogPinStates[1], 0, 4095, PI / 2, -PI / 2) * cubeVar.rotationSpeed;
 			// cubeVar.angleX += cubeVar.rotationSpeed;
 			// cubeVar.angleY += cubeVar.rotationSpeed;
 			// cubeVar.angleZ += cubeVar.rotationSpeed;
@@ -520,7 +521,7 @@ void cubeTask(void *modulePtr)
 			notifyMonitor(ARRAY_INDEX_FROM_PTR(moduleList, (Module *)modulePtr), *(int *)(((Module *)modulePtr)->parameters), eSetBits);
 			xSemaphoreGive(xMutex_CubeProj);
 		}
-	vTaskDelay(pdMS_TO_TICKS(25));
+		vTaskDelay(pdMS_TO_TICKS(25));
 	}
 }
 
@@ -574,28 +575,27 @@ void monitorCube(void *monitorPtr)
 	}
 }
 
-void IRAM_ATTR customDigitalController(void * controllerPtr){
-	
+void IRAM_ATTR customDigitalController(void *controllerPtr)
+{
+
 	Controller *controller = (Controller *)controllerPtr;
 
-	//update first switch
+	// update first switch
 	uint8_t pinState = digitalRead(controller->digitalPins[0].pin);
-    controller->digitalPinStates = (controller->digitalPinStates & ~(1 << 0)) | (pinState << 0);
+	controller->digitalPinStates = (controller->digitalPinStates & ~(1 << 0)) | (pinState << 0);
 
-	//update second switch
-    pinState = digitalRead(controller->digitalPins[1].pin);
-    controller->digitalPinStates = (controller->digitalPinStates & ~(1 << 1)) | (pinState << 1);
-
+	// update second switch
+	pinState = digitalRead(controller->digitalPins[1].pin);
+	controller->digitalPinStates = (controller->digitalPinStates & ~(1 << 1)) | (pinState << 1);
 }
 
-void IRAM_ATTR joystickSW(void * controllerPtr){
-	
+void IRAM_ATTR joystickSW(void *controllerPtr)
+{
+
 	Controller *controller = (Controller *)controllerPtr;
 
 	uint8_t pinState = digitalRead(controller->digitalPins[0].pin);
-    controller->digitalPinStates = (controller->digitalPinStates & ~(1 << 0)) | (pinState << 0);
-
-
+	controller->digitalPinStates = (controller->digitalPinStates & ~(1 << 0)) | (pinState << 0);
 }
 
 // VRx(0) pin 34 VRy(1) pin 39
@@ -634,7 +634,6 @@ void setup()
 	registerModule(producer3, "P3", MINIMAL_STACK_SIZE, 1, 0x00, 200, NULL);
 	registerModule(producer4, "P4", MINIMAL_STACK_SIZE, 1, 0x00, 200, NULL);
 
-
 	// // Enregistrement des modules consommateurs
 	registerModule(consummer1, "C1", MINIMAL_STACK_SIZE, 1, (1 << var1Index), 200, NULL);							   // Intérêt pour var1
 	registerModule(consummer2, "C2", MINIMAL_STACK_SIZE, 1, (1 << var2Index), 200, NULL);							   // Intérêt pour var2
@@ -643,7 +642,7 @@ void setup()
 	registerModule(consummer4, "C4", MINIMAL_STACK_SIZE, 1, (1 << vardataIndex), 200, NULL);						   // Intérêt pour vardata
 
 	// Enregistrer les modules producteurs
-	registerModule(replicatorA, "ReplicatorA", MINIMAL_STACK_SIZE , 1, (1 << varReplicatedIndex), 200, NULL);
+	registerModule(replicatorA, "ReplicatorA", MINIMAL_STACK_SIZE, 1, (1 << varReplicatedIndex), 200, NULL);
 	registerModule(replicatorB, "ReplicatorB", MINIMAL_STACK_SIZE, 1, (1 << varReplicatedIndex), 200, NULL);
 
 	cubeProjectSharedID = varCubeProjIndex;
@@ -655,13 +654,13 @@ void setup()
 		Serial.printf("Monitor Handle: %p Interest: 0x%X\n", sysMonitor.handle, sysMonitor.ressourceOfInterest);
 	}
 
-	PinControllerParam joysticksw_param[MAX_DIGITALPIN_IN_CONTROLLER] = {{32,INPUT_PULLDOWN,CHANGE},{0,0,0}};
-	PinControllerParam joystickvr_param[MAX_ANALOGPIN_IN_CONTROLLER] = {{34,0,0},{39,0,0}};
+	PinControllerParam joysticksw_param[MAX_DIGITALPIN_IN_CONTROLLER] = {{32, INPUT_PULLDOWN, CHANGE}, {0, 0, 0}};
+	PinControllerParam joystickvr_param[MAX_ANALOGPIN_IN_CONTROLLER] = {{34, 0, 0}, {39, 0, 0}};
 
-	registerController(joystickSW,joysticksw_param,joystickVR,joystickvr_param,20,NULL);
+	registerController(joystickSW, joysticksw_param, joystickVR, joystickvr_param, 20, NULL);
 
-	PinControllerParam customController_param[MAX_DIGITALPIN_IN_CONTROLLER] = {{15,INPUT_PULLDOWN,CHANGE},{27,INPUT_PULLDOWN,CHANGE},{0,0,0}};
-	registerController(customDigitalController,customController_param,NULL,NULL,0,NULL);
+	PinControllerParam customController_param[MAX_DIGITALPIN_IN_CONTROLLER] = {{15, INPUT_PULLDOWN, CHANGE}, {27, INPUT_PULLDOWN, CHANGE}, {0, 0, 0}};
+	registerController(customDigitalController, customController_param, NULL, NULL, 0, NULL);
 
 	// Affichage des modules enregistrés
 	for (int i = 0; i < nModule; i++)
@@ -682,18 +681,16 @@ void setup()
 			{
 				Serial.printf("\t\t\t Pin digital %d num: %d \n", i, controllerList[i].digitalPins[j].pin);
 			}
-			
 		}
 
 		if ((controllerList[i].analogHandler != NULL))
 		{
-			Serial.printf("Controller analog %d Handle: %p \tPin initialized ===> : \n", i,controllerList[i].analogHandler);
+			Serial.printf("Controller analog %d Handle: %p \tPin initialized ===> : \n", i, controllerList[i].analogHandler);
 
 			for (uint8_t j = 0; j < MAX_ANALOGPIN_IN_CONTROLLER; j++)
 			{
 				Serial.printf("\t\t\t\t\t Pin digital %d num: %d \n", i, controllerList[i].analogPins[j].pin);
 			}
-			
 		}
 	}
 
@@ -710,7 +707,7 @@ void setup()
 	{
 		if (moduleList[i].handle != NULL)
 		{
-			notifyModule(i,0,0xFFFF,eNoAction);
+			notifyModule(i, 0, 0xFFFF, eNoAction);
 		}
 	}
 }
@@ -724,19 +721,17 @@ void loop()
 {
 	// Main loop code (optional, as tasks will run independently)
 	// if (swlastVal != controllerList[0].digitalPinStates) {
-    //     swlastVal = controllerList[0].digitalPinStates;
-    //     Serial.printf("Bouton change ! %d \n",swlastVal);
-    // }
+	//     swlastVal = controllerList[0].digitalPinStates;
+	//     Serial.printf("Bouton change ! %d \n",swlastVal);
+	// }
 	// if (vrxlastVal != controllerList[0].analogPinStates[0]) {
-    //     vrxlastVal = controllerList[0].analogPinStates[0];
-    //     Serial.printf("Joy X change ! %d ",vrxlastVal);
-    // }
+	//     vrxlastVal = controllerList[0].analogPinStates[0];
+	//     Serial.printf("Joy X change ! %d ",vrxlastVal);
+	// }
 	// if (vrylastVal != controllerList[0].analogPinStates[1]) {
-    //     vrylastVal = controllerList[0].analogPinStates[1];
-    //     Serial.printf("Joy Y change ! %d \n",vrylastVal);
-    // }
-
-
+	//     vrylastVal = controllerList[0].analogPinStates[1];
+	//     Serial.printf("Joy Y change ! %d \n",vrylastVal);
+	// }
 
 	// vTaskDelay(pdMS_TO_TICKS(100));
 }
@@ -744,6 +739,54 @@ void loop()
 #endif
 
 #ifndef C_ONLY
+
+void monitorHeap()
+{
+	Serial.println("=== Statistiques Heap ===");
+	Serial.printf("\n\tFree Heap Size: %d bytes\n", xPortGetFreeHeapSize());
+	Serial.printf("\tMinimum Ever Free Heap Size: %d bytes\n\n", xPortGetMinimumEverFreeHeapSize());
+	Serial.println("============================");
+}
+
+#undef INCLUDE_uxTaskGetStackHighWaterMark
+#define INCLUDE_uxTaskGetStackHighWaterMark 1
+
+
+// cas très intéressant : ne jamais passer un objet par copie si son destructeur agit sur des variables partagés et handler de tâche (comme srtl) 
+void monitorStack(SRTL& instance)
+{
+	Module *m;
+	Serial.println("=== Statistiques Modules ===");
+	for (uint8_t i = 1; i < instance.nModule;i++ )
+	{
+		m = &instance.moduleList[i];
+		if (m->handle != NULL && eTaskGetState(m->handle) != eDeleted)
+		{
+			// Mesure de la quantité de stack libre en mots
+			UBaseType_t stackLeft = uxTaskGetStackHighWaterMark(m->handle);
+
+			// Conversion en octets (si nécessaire, dépend de la taille du mot de l'architecture)
+			size_t stackSizeBytes = stackLeft * sizeof(StackType_t);
+			Serial.printf("Task '%d': Stack remaining: %d bytes\n", ARRAY_INDEX_FROM_PTR( instance.moduleList, m), stackSizeBytes);
+		}
+		else
+		{
+			Serial.printf("Task '%d': Invalid handle!\n", ARRAY_INDEX_FROM_PTR( instance.moduleList, m));
+		}
+	}
+
+	if(instance.sysMonitor.handle != NULL){
+			UBaseType_t stackLeft = uxTaskGetStackHighWaterMark(instance.sysMonitor.handle);
+			size_t stackSizeBytes = stackLeft * sizeof(StackType_t);
+			Serial.printf("Task 'sysMonitor': Stack remaining: %d bytes\n", stackSizeBytes);
+	}
+	else
+		{
+			Serial.printf("Task 'sysMonitor': Invalid handle!\n");
+		}
+
+	Serial.println("============================");
+}
 
 void printMemoryStats()
 {
@@ -786,12 +829,10 @@ protected_data_t protected_var1 = {&xMutex_var1, (void *)&var1};
 protected_data_t protected_var2 = {&xMutex_var2, (void *)&var2};
 protected_data_t protected_vardata = {&xMutex_vardata, (void *)&vardata};
 
-
-
 void producer1(void *modulePtr)
 {
 	// setup
-	GET_SRTL_INSTANCE.join(1,GET_CURRENT_MODULE_INDEX);
+	GET_SRTL_INSTANCE.join(1, GET_CURRENT_MODULE_INDEX);
 	// Task implementation
 	for (;;)
 	{
@@ -809,7 +850,8 @@ void producer1(void *modulePtr)
 
 void producer2(void *modulePtr)
 {
-	GET_SRTL_INSTANCE.join(1,GET_CURRENT_MODULE_INDEX);
+	uint32_t ret = GET_SRTL_INSTANCE.join(1, GET_CURRENT_MODULE_INDEX);
+	Serial.printf("RETV %d\n", ret);
 
 	// Task implementation
 	for (;;)
@@ -829,7 +871,7 @@ void producer2(void *modulePtr)
 
 void producer3(void *modulePtr)
 {
-	GET_SRTL_INSTANCE.join(1,GET_CURRENT_MODULE_INDEX);
+	GET_SRTL_INSTANCE.join(1, GET_CURRENT_MODULE_INDEX);
 
 	// Task implementation
 	for (;;)
@@ -852,7 +894,7 @@ void producer3(void *modulePtr)
 
 void producer4(void *modulePtr)
 {
-	GET_SRTL_INSTANCE.join(1,GET_CURRENT_MODULE_INDEX);
+	GET_SRTL_INSTANCE.join(1, GET_CURRENT_MODULE_INDEX);
 
 	// Task implementation
 	for (;;)
@@ -872,7 +914,7 @@ void consummer1(void *modulePtr)
 {
 	float local_var1 = 0.0;
 
-	GET_SRTL_INSTANCE.join(0,GET_CURRENT_MODULE_INDEX);
+	GET_SRTL_INSTANCE.join(0, GET_CURRENT_MODULE_INDEX);
 
 	// Task implementation
 	for (;;)
@@ -902,7 +944,7 @@ void consummer2(void *modulePtr)
 {
 
 	float local_var2 = 0.0;
-	GET_SRTL_INSTANCE.join(0,GET_CURRENT_MODULE_INDEX);
+	GET_SRTL_INSTANCE.join(0, GET_CURRENT_MODULE_INDEX);
 	// Task implementation
 	for (;;)
 	{
@@ -933,7 +975,7 @@ void consummer3(void *modulePtr)
 
 	float local_var1 = 0.0, local_var2 = 0.0;
 
-	GET_SRTL_INSTANCE.join(0,GET_CURRENT_MODULE_INDEX);
+	GET_SRTL_INSTANCE.join(0, GET_CURRENT_MODULE_INDEX);
 	// Task implementation
 	for (;;)
 	{
@@ -962,7 +1004,7 @@ void consummer31(void *modulePtr)
 	currentModule.notificationValue = 0;
 	float local_var1 = 0.0, local_var2 = 0.0;
 
-	GET_SRTL_INSTANCE.join(0,GET_CURRENT_MODULE_INDEX);
+	GET_SRTL_INSTANCE.join(0, GET_CURRENT_MODULE_INDEX);
 	// Task implementation
 	for (;;)
 	{
@@ -999,7 +1041,7 @@ void consummer4(void *modulePtr)
 {
 	custom_data_t local_var;
 	uint32_t ulNotifiedValue = 0;
-	GET_SRTL_INSTANCE.join(0,GET_CURRENT_MODULE_INDEX);
+	GET_SRTL_INSTANCE.join(0, GET_CURRENT_MODULE_INDEX);
 	// Task implementation
 	for (;;)
 	{
@@ -1086,15 +1128,12 @@ void replicatorB(void *pvParameters)
 
 void test(void *modulePtr)
 {
-
-	Serial.printf("%d %d\n", ((Module *)modulePtr)->parent->nSharedResource, ((Module *)modulePtr)->parent->nModule);
-	// Serial.printf("%p %p\n",((Module*)modulePtr),((Module*)modulePtr)->parent);
-
-	Serial.println("ok");
-
+	GET_SRTL_INSTANCE.join(2,GET_CURRENT_MODULE_INDEX);
+	Serial.printf("TEST ===> nShared ressource : %d , nModule : %d\n", ((Module *)modulePtr)->parent->nSharedResource, ((Module *)modulePtr)->parent->nModule);
+	vTaskDelay(pdMS_TO_TICKS(10000));
+	Serial.printf("TEST ===> task late of %d ms\n",millis() - 10000);
 	vTaskDelete(NULL);
 }
-
 
 // TEST CUBE : MONITOR & CONTROLLER
 
@@ -1129,7 +1168,7 @@ struct cube_custom_data_t
 
 	int cubeEdges[12][2] = {
 		{0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6}, {6, 7}, {7, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7}};
-		
+
 } cubeVar;
 
 // not used for know
@@ -1153,15 +1192,15 @@ inline void rotateVertex(float vertex[3], float out[3])
 	float z = vertex[2];
 
 	float cosX = cos(cubeVar.angleX);
-    float sinX = sin(cubeVar.angleX);
-    float cosY = cos(cubeVar.angleY);
-    float sinY = sin(cubeVar.angleY);
-    float cosZ = cos(cubeVar.angleZ);
-    float sinZ = sin(cubeVar.angleZ);
+	float sinX = sin(cubeVar.angleX);
+	float cosY = cos(cubeVar.angleY);
+	float sinY = sin(cubeVar.angleY);
+	float cosZ = cos(cubeVar.angleZ);
+	float sinZ = sin(cubeVar.angleZ);
 
 	// Rotation around X axis
 	float tempY = y * cosX - z * sinX;
-	float tempZ = y *sinX + z * cosX;
+	float tempZ = y * sinX + z * cosX;
 	y = tempY;
 	z = tempZ;
 
@@ -1192,8 +1231,9 @@ inline void projectVertex(float vertex[3], int &screenX, int &screenY)
 	screenY = centerY - (int)(vertex[1] * perspectiveFactor * scale);
 }
 
-inline float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
-    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+inline float mapFloat(float x, float in_min, float in_max, float out_min, float out_max)
+{
+	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
 void cubeTask(void *modulePtr)
@@ -1205,7 +1245,7 @@ void cubeTask(void *modulePtr)
 	// xTaskNotifyWait(0, 0, &vardata.ivar, portMAX_DELAY);
 	Serial.println("Cube Begin");
 
-	GET_SRTL_INSTANCE.join(2,GET_CURRENT_MODULE_INDEX);
+	GET_SRTL_INSTANCE.join(2, GET_CURRENT_MODULE_INDEX);
 	for (;;)
 	{
 		// no need to protect cube properties for know (nobodie lse use it)
@@ -1220,8 +1260,8 @@ void cubeTask(void *modulePtr)
 		// Increment rotation angles depending on controller 0 (joystick)
 		if (xSemaphoreTake(xMutex_CubeVar, portMAX_DELAY) == pdTRUE)
 		{
-			cubeVar.angleX = mapFloat(GET_SRTL_INSTANCE.controllerList[0].analogPinStates[0], 0, 4095, -PI/2, PI/2) * cubeVar.rotationSpeed;
-			cubeVar.angleY = mapFloat(GET_SRTL_INSTANCE.controllerList[0].analogPinStates[1], 0, 4095, PI/2, -PI/2) * cubeVar.rotationSpeed;
+			cubeVar.angleX = mapFloat(GET_SRTL_INSTANCE.controllerList[0].analogPinStates[0], 0, 4095, -PI / 2, PI / 2) * cubeVar.rotationSpeed;
+			cubeVar.angleY = mapFloat(GET_SRTL_INSTANCE.controllerList[0].analogPinStates[1], 0, 4095, PI / 2, -PI / 2) * cubeVar.rotationSpeed;
 			// cubeVar.angleX += cubeVar.rotationSpeed;
 			// cubeVar.angleY += cubeVar.rotationSpeed;
 			// cubeVar.angleZ += cubeVar.rotationSpeed;
@@ -1232,12 +1272,62 @@ void cubeTask(void *modulePtr)
 		if (xSemaphoreTake(xMutex_CubeProj, portMAX_DELAY) == pdTRUE)
 		{
 			memcpy(cubeProjected.projectedVertcices, projectedVertices, sizeof(int) * 8 * 2);
-			GET_SRTL_INSTANCE.notifyMonitor(GET_CURRENT_MODULE_INDEX,GET_PARAMS_INSTANCE(int), eSetBits);
+			GET_SRTL_INSTANCE.notifyMonitor(GET_CURRENT_MODULE_INDEX, GET_PARAMS_INSTANCE(int), eSetBits);
 			xSemaphoreGive(xMutex_CubeProj);
 		}
 		vTaskDelay(pdMS_TO_TICKS(25));
 	}
 }
+
+void IRAM_ATTR customDigitalController(void *controllerPtr)
+{
+
+	Controller *controller = (Controller *)controllerPtr;
+
+	// update first switch
+	uint8_t pinState = digitalRead(controller->digitalPins[0].pin);
+	controller->digitalPinStates = (controller->digitalPinStates & ~(1 << 0)) | (pinState << 0);
+
+	// update second switch
+	pinState = digitalRead(controller->digitalPins[1].pin);
+	controller->digitalPinStates = (controller->digitalPinStates & ~(1 << 1)) | (pinState << 1);
+}
+
+void IRAM_ATTR joystickSW(void *controllerPtr)
+{
+
+	Controller *controller = (Controller *)controllerPtr;
+
+	uint8_t pinState = digitalRead(controller->digitalPins[0].pin);
+	controller->digitalPinStates = (controller->digitalPinStates & ~(1 << 0)) | (pinState << 0);
+}
+
+// VRx(0) pin 34 VRy(1) pin 39
+void IRAM_ATTR joystickVR(TimerHandle_t xTimer)
+{
+	Controller *controllerPtr = (Controller *)pvTimerGetTimerID(xTimer);
+
+	uint16_t pinState = analogRead(controllerPtr->analogPins[0].pin);
+	controllerPtr->analogPinStates[0] = pinState;
+
+	pinState = analogRead(controllerPtr->analogPins[1].pin);
+	controllerPtr->analogPinStates[1] = pinState;
+}
+
+// // WiFi credentials
+// const char *ssid = "Freebox-022439";
+// const char *password = "SebastienSexy7";
+
+// // NTP settings
+// WiFiUDP ntpUDP;
+// NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600, 60000); // UTC+1 (3600s), update every 60s
+
+// // Variables for maintaining local time
+// static unsigned long localSeconds = 0;
+// static unsigned long lastMillis   = 0;
+// static unsigned long lastSyncMillis = 0;
+
+// char timeBuffer[10] = {'\0'};
 
 void monitorCube(void *monitorPtr)
 {
@@ -1249,6 +1339,8 @@ void monitorCube(void *monitorPtr)
 	}
 	display.clearDisplay();
 	display.display();
+	display.setTextColor(WHITE, BLACK);
+	display.setTextSize(0);
 
 	// local var
 	Monitor currentModule = *((Monitor *)monitorPtr);
@@ -1259,6 +1351,7 @@ void monitorCube(void *monitorPtr)
 
 	for (;;)
 	{
+		// from any task
 		if (xTaskNotifyWait(0xFFFFFFFF, 0xFFFFFFFF, &currentModule.notificationValue, portMAX_DELAY))
 		{
 			// Draw the cube :
@@ -1281,6 +1374,9 @@ void monitorCube(void *monitorPtr)
 					SSD1306_WHITE);
 			}
 
+			// display.setCursor(centerX, centerY);
+  			// display.print(F(timeBuffer));
+
 			// Update the screen
 			display.display();
 		}
@@ -1289,48 +1385,76 @@ void monitorCube(void *monitorPtr)
 	}
 }
 
-void IRAM_ATTR customDigitalController(void * controllerPtr){
-	
-	Controller *controller = (Controller *)controllerPtr;
+// inline void syncTime()
+// {
+//   Serial.println("Syncing time with NTP...");
+//   while (!timeClient.update())
+//   {
+//     timeClient.forceUpdate();
+//   }
+//   localSeconds = timeClient.getEpochTime();
+//   Serial.println("Time synchronized!");
+// }
 
-	//update first switch
-	uint8_t pinState = digitalRead(controller->digitalPins[0].pin);
-    controller->digitalPinStates = (controller->digitalPinStates & ~(1 << 0)) | (pinState << 0);
+// void syncTimeHandler(void * modulePtr)
+// {
+//   // Connexion WiFi
+//   WiFi.begin(ssid, password);
+//   Serial.print("Connecting to WiFi");
+//   while (WiFi.status() != WL_CONNECTED)
+//   {
+//     delay(500);
+//     Serial.print(".");
+//   }
+//   Serial.println("\nConnected!");
 
-	//update second switch
-    pinState = digitalRead(controller->digitalPins[1].pin);
-    controller->digitalPinStates = (controller->digitalPinStates & ~(1 << 1)) | (pinState << 1);
+//   // Démarrage du client NTP
+//   timeClient.begin();
 
-}
+//   // Première synchro
+//   syncTime();
 
-void IRAM_ATTR joystickSW(void * controllerPtr){
-	
-	Controller *controller = (Controller *)controllerPtr;
+//   lastMillis = millis();
+//   lastSyncMillis = lastMillis;
 
-	uint8_t pinState = digitalRead(controller->digitalPins[0].pin);
-    controller->digitalPinStates = (controller->digitalPinStates & ~(1 << 0)) | (pinState << 0);
+//   GET_SRTL_INSTANCE.join(2, GET_CURRENT_MODULE_INDEX);
 
+//   for (;;)
+//   {
+//     unsigned long currentMillis = millis();
+//     // Incrémentation locale du temps
+//     localSeconds += (currentMillis - lastMillis) / 1000; 
+//     lastMillis = currentMillis;
 
-}
+//     // Calcul HH:MM:SS (UTC dans cet exemple)
+//     unsigned long secondsInDay = localSeconds % 86400; // Secondes depuis minuit
+//     int hours   = secondsInDay / 3600;
+//     int minutes = (secondsInDay % 3600) / 60;
+//     int sec     = secondsInDay % 60;
 
-// VRx(0) pin 34 VRy(1) pin 39
-void IRAM_ATTR joystickVR(TimerHandle_t xTimer)
-{
-	Controller *controllerPtr = (Controller *)pvTimerGetTimerID(xTimer);
+//     sprintf(timeBuffer, "%02d:%02d:%02d", hours, minutes, sec);
 
-	uint16_t pinState = analogRead(controllerPtr->analogPins[0].pin);
-	controllerPtr->analogPinStates[0] = pinState;
+//     // Affichage
+// 	GET_SRTL_INSTANCE.notifyMonitor(GET_CURRENT_MODULE_INDEX, GET_PARAMS_INSTANCE(int), eSetBits);
+//     Serial.printf("time : %s\n", timeBuffer);
 
-	pinState = analogRead(controllerPtr->analogPins[1].pin);
-	controllerPtr->analogPinStates[1] = pinState;
-}
+//     // Re-sync toutes les 24h avec un intervalle plutôt qu'un modulo
+//     if (currentMillis - lastSyncMillis >= 86400000UL) { // 24 heures
+//       lastSyncMillis = currentMillis;
+//       syncTime();
+//     }
+
+//     // Attente 500 ms avant la prochaine mise à jour
+//     vTaskDelay(pdMS_TO_TICKS(500));
+//   }
+// }
 
 // init
 SRTL srtl;
 
 void setup()
 {
-	Serial.begin(9600);
+	Serial.begin(115200);
 	Serial.println(F("In Setup function"));
 
 	// Enregistrement des ressources partagées
@@ -1343,61 +1467,81 @@ void setup()
 	uint8_t varCubeIndex = srtl.registerSharedResource(protected_cube);
 	uint8_t varCubeProjIndex = srtl.registerSharedResource(protected_cube_projection);
 
+	uint32_t consumerBits = 0;
+	uint32_t producerBits = 0;
+	uint32_t otherBits = 0;
+
+	otherBits |= INDEX_TO_BITSET(srtl.registerModule(test, "test", MINIMAL_STACK_SIZE , 5, 0x00, 200, NULL));
+
 	// Enregistrement des modules producteurs
-	srtl.registerModule(test, "test", MINIMAL_STACK_SIZE, 1, 0x00, 200, NULL);
-	srtl.registerModule(producer1, "P1", MINIMAL_STACK_SIZE, 1, 0x00, 200, NULL);
-	srtl.registerModule(producer2, "P2", MINIMAL_STACK_SIZE, 1, 0x00, 200, NULL);
-	srtl.registerModule(producer3, "P3", MINIMAL_STACK_SIZE, 1, 0x00, 200, NULL);
-	srtl.registerModule(producer4, "P4", MINIMAL_STACK_SIZE, 1, 0x00, 200, NULL);
+	producerBits |= INDEX_TO_BITSET(srtl.registerModule(producer1, "P1", MINIMAL_STACK_SIZE , 1, 0x00, 200, NULL));
+	producerBits |= INDEX_TO_BITSET(srtl.registerModule(producer2, "P2", MINIMAL_STACK_SIZE , 1, 0x00, 200, NULL));
+	producerBits |= INDEX_TO_BITSET(srtl.registerModule(producer3, "P3", MINIMAL_STACK_SIZE , 1, 0x00, 200, NULL));
+	producerBits |= INDEX_TO_BITSET(srtl.registerModule(producer4, "P4", MINIMAL_STACK_SIZE , 1, 0x00, 200, NULL));
 
 	// // Enregistrement des modules consommateurs
-	srtl.registerModule(consummer1, "C1", MINIMAL_STACK_SIZE, 1, (1 << var1Index), 200, NULL);								// Intérêt pour var1
-	srtl.registerModule(consummer2, "C2", MINIMAL_STACK_SIZE, 1, (1 << var2Index), 200, NULL);								// Intérêt pour var2
-	srtl.registerModule(consummer3, "C3", MINIMAL_STACK_SIZE, 1, (1 << var1Index) | (1 << var2Index), 200, NULL);			// Intérêt pour var1 et var2
-	srtl.registerModule(consummer31, "consummer31", MINIMAL_STACK_SIZE, 2, (1 << var1Index) | (1 << var2Index), 200, NULL); // Intérêt pour var1 et var2
-	srtl.registerModule(consummer4, "C4", MINIMAL_STACK_SIZE, 1, (1 << vardataIndex), 200, NULL);							// Intérêt pour vardata
+	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer1, "C1", MINIMAL_STACK_SIZE , 1, (1 << var1Index), 200, NULL));								// Intérêt pour var1
+	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer2, "C2", MINIMAL_STACK_SIZE , 1, (1 << var2Index), 200, NULL));								// Intérêt pour var2
+	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer3, "C3", MINIMAL_STACK_SIZE , 1, (1 << var1Index) | (1 << var2Index), 200, NULL));			// Intérêt pour var1 et var2
+	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer31, "consummer31", MINIMAL_STACK_SIZE *2, 2, (1 << var1Index) | (1 << var2Index), 200, NULL)); // Intérêt pour var1 et var2
+	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer4, "C4", MINIMAL_STACK_SIZE , 1, (1 << vardataIndex), 200, NULL));							// Intérêt pour vardata
 
-	// // Enregistrer les modules producteurs
-	srtl.registerModule(replicatorA, "ReplicatorA", MINIMAL_STACK_SIZE, 1, (1 << varReplicatedIndex), 200, NULL);
-	srtl.registerModule(replicatorB, "ReplicatorB", MINIMAL_STACK_SIZE, 1, (1 << varReplicatedIndex), 200, NULL);
-
+	// Enregistrer les modules producteurs
+	srtl.registerModule(replicatorA, "ReplicatorA", MINIMAL_STACK_SIZE * 2, 1, (1 << varReplicatedIndex), 200, NULL);
+	srtl.registerModule(replicatorB, "ReplicatorB", MINIMAL_STACK_SIZE * 2, 1, (1 << varReplicatedIndex), 200, NULL);
 
 	// TEST CUBE
 
 	cubeProjectSharedID = varCubeProjIndex;
-	srtl.registerModule(cubeTask, "Cube_compute", MINIMAL_STACK_SIZE, 3, 0x00, 50, &cubeProjectSharedID);
+	otherBits |= INDEX_TO_BITSET(srtl.registerModule(cubeTask, "Cube_compute", MINIMAL_STACK_SIZE * 2, 3, 0x00, 50, &cubeProjectSharedID));
 
-	srtl.registerMonitor(monitorCube, "OLED_Sreen", MINIMAL_STACK_SIZE, 3, 50, NULL);
+	// MONITOR 
+
+	srtl.registerMonitor(monitorCube, "OLED_Sreen", MINIMAL_STACK_SIZE * 2 , 3, 50, NULL);
 	if (srtl.sysMonitor.handle != NULL)
 	{
 		Serial.printf("Monitor Handle: %p Interest: 0x%X\n", srtl.sysMonitor.handle, srtl.sysMonitor.ressourceOfInterest);
 	}
 
-	PinControllerParam joysticksw_param[MAX_DIGITALPIN_IN_CONTROLLER] = {{32,INPUT_PULLDOWN,CHANGE},{0,0,0}};
-	PinControllerParam joystickvr_param[MAX_ANALOGPIN_IN_CONTROLLER] = {{34,0,0},{39,0,0}};
+	// CONTROLLER
 
-	srtl.registerController(joystickSW,joysticksw_param,joystickVR,joystickvr_param,20,NULL);
+	PinControllerParam joysticksw_param[MAX_DIGITALPIN_IN_CONTROLLER] = {{32, INPUT_PULLDOWN, CHANGE}, {0, 0, 0}};
+	PinControllerParam joystickvr_param[MAX_ANALOGPIN_IN_CONTROLLER] = {{34, 0, 0}, {39, 0, 0}};
 
-	PinControllerParam customController_param[MAX_DIGITALPIN_IN_CONTROLLER] = {{15,INPUT_PULLDOWN,CHANGE},{27,INPUT_PULLDOWN,CHANGE},{0,0,0}};
-	srtl.registerController(customDigitalController,customController_param,NULL,NULL,0,NULL);
+	srtl.registerController(joystickSW, joysticksw_param, joystickVR, joystickvr_param, 20, NULL);
 
+	PinControllerParam customController_param[MAX_DIGITALPIN_IN_CONTROLLER] = {{15, INPUT_PULLDOWN, CHANGE}, {27, INPUT_PULLDOWN, CHANGE}, {0, 0, 0}};
+	srtl.registerController(customDigitalController, customController_param, NULL, NULL, 0, NULL);
 
+	// srtl.registerModule(syncTimeHandler, "SYNCTIME", MINIMAL_STACK_SIZE, 1, 0x0, 200, NULL);
+	
 	// JOIN
 
-	// Wait initialization of all task with join barriere consummers(11 1110 0000) : 0, producers(1 1110) : 1, cubetask : 2
-	while(srtl.joinList[0] != 0x3E0); // ALL consummers are waiting
-	uint8_t released = srtl.release(0);
-	Serial.printf("Consummer Released %d",released);
-	while((srtl.joinList[1] != 0x1E) && (srtl.joinList[0] != 0x3E0)); // ALL producer are ready and consummer are waiting
-	released = srtl.unjoin(1,4);
-	Serial.printf("Producer  %d leave barrier 1",released);
+	// assert(consumerBits == 0b1111100000);
+	// assert(producerBits == 0b11110);
+
+	// Wait initialization of all task with join barriere consummers(11 1110 0000) : 0, producers(1 1110) : 1, cubetask : 2 (1 0000 0000 0000)
+	while (srtl.joinList[0] != consumerBits)
+	{
+		Serial.printf("wait 0 : %s\n", TO_BIN(srtl.joinList[0]));
+	} // ALL consummers are waiting
+	uint32_t released = srtl.release(0);
+	Serial.printf("Consummer Released %s\n", TO_BIN(released));
+	while ((srtl.joinList[1] != producerBits) && (released != consumerBits))
+	{
+		Serial.printf("wait 0 : %s, wait 1 :%s\n", TO_BIN(released), TO_BIN(srtl.joinList[1]));
+	} // ALL producer are ready and consummer are waiting
+	released = srtl.unjoin(1, 4);
+	Serial.printf("Producer  %d leave barrier 1\n", released);
 	delay(1000);
 	released = srtl.release(1);
-	Serial.printf("Producer Released %d",released);
-	while(srtl.sysMonitor.handle == NULL);
+	Serial.printf("Producer Released %s\n", TO_BIN(released));
+	while (srtl.sysMonitor.handle == NULL)
+	{
+		Serial.printf("wait 2 %s\n", TO_BIN(srtl.joinList[2]));
+	} // Handler has begin
 	released = srtl.release(2);
-	Serial.printf("Cube Released %d",released);
-
+	Serial.printf("Cube Released %s\n", TO_BIN(released));
 
 	// DEBUG
 
@@ -1410,33 +1554,33 @@ void setup()
 		}
 	}
 
-	for (int i = 0; i < srtl.nController; i++)
-	{
-		if ((srtl.controllerList[i].digitalHandler != NULL))
-		{
-			Serial.printf("Controller digital %d Handle: %p Pin initialized ===> : \n", i, srtl.controllerList[i].digitalHandler);
+	// // Affichage des controllers
+	// for (int i = 0; i < srtl.nController; i++)
+	// {
+	// 	if ((srtl.controllerList[i].digitalHandler != NULL))
+	// 	{
+	// 		Serial.printf("Controller digital %d Handle: %p Pin initialized ===> : \n", i, srtl.controllerList[i].digitalHandler);
 
-			for (uint8_t j = 0; j < MAX_DIGITALPIN_IN_CONTROLLER; j++)
-			{
-				Serial.printf("\t\t\t Pin digital %d num: %d \n", i, srtl.controllerList[i].digitalPins[j].pin);
-			}
-			
-		}
+	// 		for (uint8_t j = 0; j < MAX_DIGITALPIN_IN_CONTROLLER; j++)
+	// 		{
+	// 			Serial.printf("\t\t\t Pin digital %d num: %d \n", i, srtl.controllerList[i].digitalPins[j].pin);
+	// 		}
+	// 	}
 
-		if ((srtl.controllerList[i].analogHandler != NULL))
-		{
-			Serial.printf("Controller analog %d Handle: %p \tPin initialized ===> : \n", i,srtl.controllerList[i].analogHandler);
+	// 	if ((srtl.controllerList[i].analogHandler != NULL))
+	// 	{
+	// 		Serial.printf("Controller analog %d Handle: %p \tPin initialized ===> : \n", i, srtl.controllerList[i].analogHandler);
 
-			for (uint8_t j = 0; j < MAX_ANALOGPIN_IN_CONTROLLER; j++)
-			{
-				Serial.printf("\t\t\t\t\t Pin digital %d num: %d \n", i, srtl.controllerList[i].analogPins[j].pin);
-			}
-			
-		}
-	}
+	// 		for (uint8_t j = 0; j < MAX_ANALOGPIN_IN_CONTROLLER; j++)
+	// 		{
+	// 			Serial.printf("\t\t\t\t\t Pin digital %d num: %d \n", i, srtl.controllerList[i].analogPins[j].pin);
+	// 		}
+	// 	}
+	// }
 
-	// monitorStack();
-	// monitorHeap();
+
+	monitorStack(srtl);
+	monitorHeap();
 	Serial.printf("Program size: %d \n", ESP.getSketchSize());
 	printMemoryStats();
 }
