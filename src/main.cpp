@@ -1,3 +1,4 @@
+// #define LOG_LOCAL_LEVEL ESP_LOG_ERROR
 #include <Arduino.h>
 #include <srtl.h>
 
@@ -6,6 +7,31 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
+#include <esp_log.h>
+
+
+
+/*
+Debug 
+cd C:\Users\haron\.platformio\packages\toolchain-xtensa-esp32\bin
+.\xtensa-esp32-elf-addr2line -pfiaC -e "C:\Users\haron\Documents\PlatformIO\Projects\SimpleRealTimeLayer_Lib\.pio\build\esp32doit-devkit-v1\firmware.elf" backtrace
+*/
+
+#define configCHECK_FOR_STACK_OVERFLOW 2
+#define configUSE_MALLOC_FAILED_HOOK 1
+
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
+   	log_e("Stack overflow in task: %s\n", pcTaskName);
+    while (1);
+}
+
+void vApplicationMallocFailedHook(void) {
+    log_e("Heap allocation failed!");
+    while (1);
+}
+
+
+// #define configTOTAL_HEAP_SIZE ((1024) * (128))
 
 #ifdef C_ONLY
 // DEBUG
@@ -740,24 +766,58 @@ void loop()
 
 #ifndef C_ONLY
 
-void monitorHeap()
-{
-	Serial.println("=== Statistiques Heap ===");
-	Serial.printf("\n\tFree Heap Size: %d bytes\n", xPortGetFreeHeapSize());
-	Serial.printf("\tMinimum Ever Free Heap Size: %d bytes\n\n", xPortGetMinimumEverFreeHeapSize());
-	Serial.println("============================");
-}
-
 #undef INCLUDE_uxTaskGetStackHighWaterMark
 #define INCLUDE_uxTaskGetStackHighWaterMark 1
+/*
+	// #undef configGENERATE_RUN_TIME_STATS
+	// #define configGENERATE_RUN_TIME_STATS 1
+	// #undef configUSE_STATS_FORMATTING_FUNCTIONS
+	// #define configUSE_STATS_FORMATTING_FUNCTIONS 1
+	// #undef configSUPPORT_DYNAMIC_ALLOCATION
+	// #define configSUPPORT_DYNAMIC_ALLOCATION 1
+	// #define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS() configureTimerForRunTimeStats()
+	// #define portGET_RUN_TIME_COUNTER_VALUE() getRunTimeCounterValue()
+
+	// // Déclaration globale pour le timer
+	// hw_timer_t *timer = NULL;
+	// volatile uint32_t runTimeCounter = 0;
+
+	// // Fonction pour configurer le timer pour les statistiques FreeRTOS
+	// void configureTimerForRunTimeStats() {
+	//     // Initialiser le timer matériel
+	//     timer = timerBegin(0, 80, true); // Timer 0, diviseur d'horloge (80 pour µs), comptage ascendant
+	//     timerAttachInterrupt(timer, []() {
+	//         runTimeCounter++;
+	//     }, true); // Lier une ISR pour incrémenter le compteur
+	//     timerAlarmWrite(timer, 1000, true); // Déclenchement toutes les 1000 µs (1 ms)
+	//     timerAlarmEnable(timer); // Activer l'alarme
+	// }
+
+	// // Fonction pour obtenir la valeur du compteur d'exécution
+	// unsigned long getRunTimeCounterValue() {
+	//     return runTimeCounter; // Retourne la valeur du compteur global
+	// }
 
 
-// cas très intéressant : ne jamais passer un objet par copie si son destructeur agit sur des variables partagés et handler de tâche (comme srtl) 
-void monitorStack(SRTL& instance)
+	// void runTimeStats(){
+	// 	Serial.println("=== FreeRTOS run TIME ===");
+	// 	char buffer[1024];
+	// 	vTaskGetRunTimeStats(buffer);
+	// 	Serial.println(buffer);
+	// 	Serial.println("=== FreeRTOS run TIME ===");
+	// }
+*/
+
+/*
+État des piles (stacks) allouées pour les tâches.
+Détection d'un éventuel débordement de pile pour un module.
+*/
+void monitorStack(SRTL &instance)
 {
+	// cas très intéressant : ne jamais passer un objet par copie si son destructeur agit sur des variables partagés et handler de tâche (comme srtl)
 	Module *m;
 	Serial.println("=== Statistiques Modules ===");
-	for (uint8_t i = 1; i < instance.nModule;i++ )
+	for (uint8_t i = 1; i < instance.nModule; i++)
 	{
 		m = &instance.moduleList[i];
 		if (m->handle != NULL && eTaskGetState(m->handle) != eDeleted)
@@ -767,30 +827,46 @@ void monitorStack(SRTL& instance)
 
 			// Conversion en octets (si nécessaire, dépend de la taille du mot de l'architecture)
 			size_t stackSizeBytes = stackLeft * sizeof(StackType_t);
-			Serial.printf("Task '%d': Stack remaining: %d bytes\n", ARRAY_INDEX_FROM_PTR( instance.moduleList, m), stackSizeBytes);
+			Serial.printf("Task '%d': Stack remaining: %d bytes\n", ARRAY_INDEX_FROM_PTR(instance.moduleList, m), stackSizeBytes);
 		}
 		else
 		{
-			Serial.printf("Task '%d': Invalid handle!\n", ARRAY_INDEX_FROM_PTR( instance.moduleList, m));
+			Serial.printf("Task '%d': Invalid handle!\n", ARRAY_INDEX_FROM_PTR(instance.moduleList, m));
 		}
 	}
 
-	if(instance.sysMonitor.handle != NULL){
-			UBaseType_t stackLeft = uxTaskGetStackHighWaterMark(instance.sysMonitor.handle);
-			size_t stackSizeBytes = stackLeft * sizeof(StackType_t);
-			Serial.printf("Task 'sysMonitor': Stack remaining: %d bytes\n", stackSizeBytes);
+	if (instance.sysMonitor.handle != NULL)
+	{
+		UBaseType_t stackLeft = uxTaskGetStackHighWaterMark(instance.sysMonitor.handle);
+		size_t stackSizeBytes = stackLeft * sizeof(StackType_t);
+		Serial.printf("Task 'sysMonitor': Stack remaining: %d bytes\n", stackSizeBytes);
 	}
 	else
-		{
-			Serial.printf("Task 'sysMonitor': Invalid handle!\n");
-		}
+	{
+		Serial.printf("Task 'sysMonitor': Invalid handle!\n");
+	}
 
 	Serial.println("============================");
 }
 
+/*
+* Affiche la taille du programme (section TEXT). Inclut les instructions machine et les constantes en ROM.
+* Renvoie la taille totale du tas global (somme de tous les blocs disponibles pour l'allocation dynamique).
+* Renvoie la mémoire disponible dans le tas global.
+* Affiche la taille du plus grand bloc contigu libre dans le tas global. Mesure utile pour déterminer si une allocation de mémoire importante peut réussir.
+* Affiche la taille totale de la mémoire interne (DRAM uniquement, sans PSRAM).
+* Affiche la mémoire DRAM libre.
+* Renvoie la quantité de mémoire libre actuellement disponible dans le tas global.
+	Exprime la fragmentation potentielle si le tas est très divisé en petits blocs.
+* Renvoie la plus petite quantité de mémoire libre jamais enregistrée depuis le démarrage du système.
+	Indique si  l'application s’approche d’un épuisement de mémoire.
+*/
 void printMemoryStats()
 {
 	Serial.println("=== Statistiques Mémoire ===");
+	Serial.print("Program size : ");
+	Serial.println(ESP.getSketchSize());
+
 	Serial.print("Heap totale : ");
 	Serial.println(heap_caps_get_total_size(MALLOC_CAP_DEFAULT));
 
@@ -805,6 +881,10 @@ void printMemoryStats()
 
 	Serial.print("Heap DRAM libre : ");
 	Serial.println(heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+
+	Serial.printf("\n\tFree Heap Size: %d bytes\n", xPortGetFreeHeapSize());
+	Serial.printf("\tMinimum Ever Free Heap Size: %d bytes\n\n", xPortGetMinimumEverFreeHeapSize());
+
 	Serial.println("============================");
 }
 
@@ -838,7 +918,7 @@ void producer1(void *modulePtr)
 	{
 		if (xSemaphoreTake(xMutex_var1, portMAX_DELAY) == pdTRUE)
 		{
-			Serial.println(F("Producer1"));
+			// Serial.println(F("Producer1"));
 			*(float *)GET_SRTL_INSTANCE.sharedRessources[0] += 0.01;
 			xSemaphoreGive(xMutex_var1);
 		}
@@ -851,14 +931,14 @@ void producer1(void *modulePtr)
 void producer2(void *modulePtr)
 {
 	uint32_t ret = GET_SRTL_INSTANCE.join(1, GET_CURRENT_MODULE_INDEX);
-	Serial.printf("RETV %d\n", ret);
+	// Serial.printf("RETV %d\n", ret);
 
 	// Task implementation
 	for (;;)
 	{
 		if (xSemaphoreTake(xMutex_var2, portMAX_DELAY) == pdTRUE)
 		{
-			Serial.println(F("Producer2"));
+			// Serial.println(F("Producer2"));
 			*(float *)GET_SRTL_INSTANCE.sharedRessources[1] += 0.02;
 			xSemaphoreGive(xMutex_var2);
 		}
@@ -876,7 +956,7 @@ void producer3(void *modulePtr)
 	// Task implementation
 	for (;;)
 	{
-		Serial.println(F("Producer3"));
+		// Serial.println(F("Producer3"));
 		if (xSemaphoreTake(xMutex_var1, portMAX_DELAY) == pdTRUE)
 		{
 			*(float *)GET_SRTL_INSTANCE.sharedRessources[0] -= 0.01;
@@ -904,8 +984,12 @@ void producer4(void *modulePtr)
 			((custom_data_t *)GET_SRTL_INSTANCE.sharedRessources[2])->cvar += 1;
 			xSemaphoreGive(xMutex_vardata);
 		}
+
+		// Serial.printf("test %d\n",xMutex_var2->uxItemSize);
+
 		if (GET_SRTL_INSTANCE.notifyAll(0b1000, 0b100, eSetValueWithoutOverwrite))
 			Serial.println(F("Producer4"));
+
 		vTaskDelay(pdMS_TO_TICKS(50)); // Delay for 1000ms
 	}
 }
@@ -935,7 +1019,7 @@ void consummer1(void *modulePtr)
 				xSemaphoreGive(xMutex_var1);
 			}
 		}
-		Serial.printf("consumer1 var1: %.2f\n", local_var1);
+		// Serial.printf("consumer1 var1: %.2f\n", local_var1);
 		vTaskDelay(pdMS_TO_TICKS(200));
 	}
 }
@@ -962,7 +1046,7 @@ void consummer2(void *modulePtr)
 				xSemaphoreGive(xMutex_var2);
 			}
 		}
-		Serial.printf("consumer2 var2: %.2f\n", local_var2);
+		// Serial.printf("consumer2 var2: %.2f\n", local_var2);
 		vTaskDelay(pdMS_TO_TICKS(200));
 	}
 }
@@ -991,7 +1075,7 @@ void consummer3(void *modulePtr)
 			local_var2 = *(float *)GET_SRTL_INSTANCE.sharedRessources[1];
 			xSemaphoreGive(xMutex_var2);
 
-			Serial.printf("consumer3 var1: %.2f var2: %.2f src: 0x%08X\n", local_var1, local_var2, currentModule.notificationValue);
+			// Serial.printf("consumer3 var1: %.2f var2: %.2f src: 0x%08X\n", local_var1, local_var2, currentModule.notificationValue);
 		}
 		vTaskDelay(pdMS_TO_TICKS(200));
 	}
@@ -1016,7 +1100,7 @@ void consummer31(void *modulePtr)
 				xSemaphoreTake(xMutex_var1, portMAX_DELAY);
 				local_var1 = *(float *)GET_SRTL_INSTANCE.sharedRessources[0];
 
-				Serial.printf("consumer31 var1: %.2f var2: %.2f src: 0x%08X \t1\n", local_var1, local_var2, currentModule.notificationValue);
+				// Serial.printf("consumer31 var1: %.2f var2: %.2f src: 0x%08X \t1\n", local_var1, local_var2, currentModule.notificationValue);
 				xSemaphoreGive(xMutex_var1);
 			}
 
@@ -1026,7 +1110,7 @@ void consummer31(void *modulePtr)
 				xSemaphoreTake(xMutex_var2, portMAX_DELAY);
 				local_var2 = *(float *)GET_SRTL_INSTANCE.sharedRessources[1];
 
-				Serial.printf("consumer31 var1: %.2f var2: %.2f src: 0x%08X \t2\n ", local_var1, local_var2, currentModule.notificationValue);
+				// Serial.printf("consumer31 var1: %.2f var2: %.2f src: 0x%08X \t2\n ", local_var1, local_var2, currentModule.notificationValue);
 				xSemaphoreGive(xMutex_var2);
 			}
 
@@ -1060,7 +1144,7 @@ void consummer4(void *modulePtr)
 				xSemaphoreGive(xMutex_vardata);
 			}
 		}
-		Serial.printf("consumer4 var: %d\n", local_var.cvar);
+		// Serial.printf("consumer4 var: %d\n", local_var.cvar);
 		vTaskDelay(pdMS_TO_TICKS(1000));
 	}
 }
@@ -1091,7 +1175,7 @@ void replicatorA(void *pvParameters)
 			((replicated_custom_data_t *)protected_replicatedVar.data)->replicationCount++; // Incrémenter le compteur
 
 			// Log l'état de la ressource répliquée
-			Serial.printf("ReplicatorA: replicatedVar = %.2f, replicationCount = %d\n", ((replicated_custom_data_t *)protected_replicatedVar.data)->replicatedVar, ((replicated_custom_data_t *)protected_replicatedVar.data)->replicationCount);
+			// Serial.printf("ReplicatorA: replicatedVar = %.2f, replicationCount = %d\n", ((replicated_custom_data_t *)protected_replicatedVar.data)->replicatedVar, ((replicated_custom_data_t *)protected_replicatedVar.data)->replicationCount);
 
 			// Libérer le mutex pour permettre à l'autre producteur d'accéder à la ressource
 			xSemaphoreGive(xMutex_replicatedVar);
@@ -1115,7 +1199,7 @@ void replicatorB(void *pvParameters)
 			((replicated_custom_data_t *)protected_replicatedVar.data)->replicationCount++; // Incrémenter le compteur
 
 			// Log l'état de la ressource répliquée
-			Serial.printf("ReplicatorB: replicatedVar = %.2f, replicationCount = %d\n", ((replicated_custom_data_t *)protected_replicatedVar.data)->replicatedVar, ((replicated_custom_data_t *)protected_replicatedVar.data)->replicationCount);
+			// Serial.printf("ReplicatorB: replicatedVar = %.2f, replicationCount = %d\n", ((replicated_custom_data_t *)protected_replicatedVar.data)->replicatedVar, ((replicated_custom_data_t *)protected_replicatedVar.data)->replicationCount);
 
 			// Libérer le mutex pour permettre à l'autre producteur d'accéder à la ressource
 			xSemaphoreGive(xMutex_replicatedVar);
@@ -1128,10 +1212,10 @@ void replicatorB(void *pvParameters)
 
 void test(void *modulePtr)
 {
-	GET_SRTL_INSTANCE.join(2,GET_CURRENT_MODULE_INDEX);
-	Serial.printf("TEST ===> nShared ressource : %d , nModule : %d\n", ((Module *)modulePtr)->parent->nSharedResource, ((Module *)modulePtr)->parent->nModule);
+	GET_SRTL_INSTANCE.join(2, GET_CURRENT_MODULE_INDEX);
+	// Serial.printf("TEST ===> nShared ressource : %d , nModule : %d\n", ((Module *)modulePtr)->parent->nSharedResource, ((Module *)modulePtr)->parent->nModule);
 	vTaskDelay(pdMS_TO_TICKS(10000));
-	Serial.printf("TEST ===> task late of %d ms\n",millis() - 10000);
+	// Serial.printf("TEST ===> task late of %d ms\n", millis() - 10000);
 	vTaskDelete(NULL);
 }
 
@@ -1171,7 +1255,6 @@ struct cube_custom_data_t
 
 } cubeVar;
 
-// not used for know
 SemaphoreHandle_t xMutex_CubeVar;
 protected_data_t protected_cube = {&xMutex_CubeVar, (void *)&cubeVar};
 
@@ -1222,13 +1305,13 @@ inline void rotateVertex(float vertex[3], float out[3])
 	out[2] = z;
 }
 
-inline void projectVertex(float vertex[3], int &screenX, int &screenY)
+inline void projectVertex(float vertex[3], int &screenX, int &screenY, uint8_t drawScale = scale)
 {
 	// Apply perspective projection
 	float zOffset = 3; // Prevent division by zero
 	float perspectiveFactor = 1 / (zOffset - vertex[2]);
-	screenX = centerX + (int)(vertex[0] * perspectiveFactor * scale);
-	screenY = centerY - (int)(vertex[1] * perspectiveFactor * scale);
+	screenX = centerX + (int)(vertex[0] * perspectiveFactor * drawScale);
+	screenY = centerY - (int)(vertex[1] * perspectiveFactor * drawScale);
 }
 
 inline float mapFloat(float x, float in_min, float in_max, float out_min, float out_max)
@@ -1248,8 +1331,7 @@ void cubeTask(void *modulePtr)
 	GET_SRTL_INSTANCE.join(2, GET_CURRENT_MODULE_INDEX);
 	for (;;)
 	{
-		// no need to protect cube properties for know (nobodie lse use it)
-		// Serial.printf("vertice 1 coor %f %f %f ",cubeVar.cubeVertices[0][0],cubeVar.cubeVertices[0][1],cubeVar.cubeVertices[0][2]);
+
 		//  Rotate and project each vertex
 		for (int i = 0; i < 8; i++)
 		{
@@ -1278,6 +1360,154 @@ void cubeTask(void *modulePtr)
 		vTaskDelay(pdMS_TO_TICKS(25));
 	}
 }
+
+const uint8_t nedgeTab[10] = {6, 2, 5, 5, 4, 5, 5, 3, 7, 5};
+
+struct Digit
+{
+
+	float angleX = 0;
+	float angleY = 0;
+	float angleZ = 0;
+	float rotationSpeed = 1;
+	uint8_t pixelScale = 10;
+
+	uint8_t number; // Le chiffre (0 à 9)
+	/*
+								x		y			0 : 0->1->3->5->4->2->0
+													1 : 1->3->5
+			0---1          	0 : -0.5	-1          2 : 0->1->3->2->4->5
+			|   |			1 : 0.5		-1          3 : 0->1->3->5->4 et 3->2
+			2---3			2 : -0.5	0			4 : 0->2->3->5
+			|   |			3 : 0.5		0			5 : 1->0->2->3->5->4
+			4---5           4 : -0.5	1			6 : 1->0->2->3->5->4->2
+							5 : 0.5		1			7 : 0->1->3->5
+													8 : 0->1->3->2->0 et 2->3->5->4->2
+													9 : 4->5->3->1->0->2->3
+	*/
+
+	float vertices[6][3] = {
+		{-0.5, -1, 0},
+		{0.5, -1, 0},
+		{-0.5, 0, 0},
+		{0.5, 0, 0},
+		{-0.5, 1, 0},
+		{0.5, 1, 0}};
+	uint8_t edges[7][3] = {0};
+
+	// Fonction pour définir les edges en fonction du digit
+	void setDigit(uint8_t num)
+	{
+		number = num;
+
+		switch (num)
+		{
+		case 0:
+			edges[0][0] = 0;
+			edges[0][1] = 1;
+			edges[1][0] = 1;
+			edges[1][1] = 3;
+			edges[2][0] = 3;
+			edges[2][1] = 5;
+			edges[3][0] = 5;
+			edges[3][1] = 4;
+			edges[4][0] = 4;
+			edges[4][1] = 2;
+			edges[5][0] = 2;
+			edges[5][1] = 0;
+			break;
+
+		case 1:
+			edges[0][0] = 1;
+			edges[0][1] = 3;
+			edges[1][0] = 3;
+			edges[1][1] = 5;
+			break;
+
+		case 8:
+			edges[0][0] = 0;
+			edges[0][1] = 1;
+			edges[1][0] = 1;
+			edges[1][1] = 3;
+			edges[2][0] = 3;
+			edges[2][1] = 2;
+			edges[3][0] = 2;
+			edges[3][1] = 4;
+			edges[4][0] = 4;
+			edges[4][1] = 5;
+			edges[5][0] = 5;
+			edges[5][1] = 0;
+			break;
+
+		default:
+			break;
+		}
+	}
+};
+
+struct DigitalClock
+{
+	struct Digit digits[6];
+} digitalClock;
+
+SemaphoreHandle_t xMutex_digitalClockVar;
+protected_data_t protected_clock = {&xMutex_digitalClockVar, (void *)&digitalClock};
+
+int clockProjected[6][6][2];
+SemaphoreHandle_t xMutex_ClockProj;
+protected_data_t protected_clock_projection = {&xMutex_ClockProj, (void *)&clockProjected};
+
+// void digitalClockTask(void *modulePtr)
+// {
+// 	const uint8_t nDigitInClock = 6;
+// 	const uint8_t nVerticeInDigit = 6;
+
+// 	// local variables
+// 	float transformedVertices[nDigitInClock][nVerticeInDigit][3];
+// 	int projectedVertices[nDigitInClock][nVerticeInDigit][2];
+
+// 	digitalClock.digits[0].setDigit(0);
+
+// 	Serial.println("Clock Begin");
+
+// 	GET_SRTL_INSTANCE.join(2, GET_CURRENT_MODULE_INDEX);
+// 	for (;;)
+// 	{
+
+// 		//  Rotate and project each vertex for each digits
+// 		for (int i = 0; i < nDigitInClock; i++)
+// 		{
+// 			for (int j = 0; j < nVerticeInDigit; j++)
+// 			{
+// 				rotateVertex(digitalClock.digits[i].vertices[j], transformedVertices[i][j]);
+// 				projectVertex(transformedVertices[i][j], projectedVertices[i][j][0], projectedVertices[i][j][1]);
+// 			}
+// 		}
+
+// 		// Increment rotation angles depending on controller 0 (joystick)
+// 		if (xSemaphoreTake(xMutex_digitalClockVar, portMAX_DELAY) == pdTRUE)
+// 		{
+// 			for (int i = 0; i < nDigitInClock; i++)
+// 			{
+// 				digitalClock.digits[i].angleX = mapFloat(GET_SRTL_INSTANCE.controllerList[0].analogPinStates[0], 0, 4095, -PI / 2, PI / 2) * digitalClock.digits[i].rotationSpeed;
+// 				digitalClock.digits[i].angleY = mapFloat(GET_SRTL_INSTANCE.controllerList[0].analogPinStates[1], 0, 4095, PI / 2, -PI / 2) * digitalClock.digits[i].rotationSpeed;
+// 			}
+// 			xSemaphoreGive(xMutex_digitalClockVar);
+// 		}
+
+// 		// store new Value of projection and send it to Monitor
+// 		if (xSemaphoreTake(xMutex_ClockProj, portMAX_DELAY) == pdTRUE)
+// 		{
+// 			for (int i = 0; i < nDigitInClock; i++)
+// 			{
+// 				memcpy(clockProjected[i], projectedVertices[i], sizeof(int) * nVerticeInDigit * 2);
+// 				GET_SRTL_INSTANCE.notifyMonitor(GET_CURRENT_MODULE_INDEX, GET_PARAMS_INSTANCE(int), eSetBits);
+// 			}
+// 			xSemaphoreGive(xMutex_ClockProj);
+// 		}
+// 		vTaskDelay(pdMS_TO_TICKS(25));
+// 	}
+// }
 
 void IRAM_ATTR customDigitalController(void *controllerPtr)
 {
@@ -1329,23 +1559,42 @@ void IRAM_ATTR joystickVR(TimerHandle_t xTimer)
 
 // char timeBuffer[10] = {'\0'};
 
+portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+
 void monitorCube(void *monitorPtr)
 {
 	if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
 	{
 		Serial.println(F("SSD1306 allocation failed"));
-		for (;;)
-			;
+		for (;;);
 	}
+
+	// display.ssd1306_command(SSD1306_MEMORYMODE); // Commande pour changer le mode mémoire
+	// display.ssd1306_command(0x00);    // Passer en mode horizontal
+
+	Serial.print("Stack size monitor: ");
+    Serial.println(uxTaskGetStackHighWaterMark(NULL));
 	display.clearDisplay();
+	vTaskDelay(pdMS_TO_TICKS(1000));
+	Serial.println("Monitor Begin");
+
+	// portENTER_CRITICAL(&mux);
 	display.display();
+	// portEXIT_CRITICAL(&mux);
+
+
+
 	display.setTextColor(WHITE, BLACK);
 	display.setTextSize(0);
 
 	// local var
 	Monitor currentModule = *((Monitor *)monitorPtr);
 	currentModule.notificationValue = 0;
-	int projectedVertices[8][2];
+	int cubeProjectedVertices[8][2];
+
+	// const u_int8_t nDigitInClock = 6;
+	// const u_int8_t nVerticeInDigit = 6;
+	// int clockProjectedVertices[6][6][2];
 
 	Serial.println("Monitor Begin");
 
@@ -1359,7 +1608,7 @@ void monitorCube(void *monitorPtr)
 			// load vertices
 			if (xSemaphoreTake(xMutex_CubeProj, portMAX_DELAY) == pdTRUE)
 			{
-				memcpy(projectedVertices, cubeProjected.projectedVertcices, sizeof(int) * 8 * 2);
+				memcpy(cubeProjectedVertices, cubeProjected.projectedVertcices, sizeof(int) * 8 * 2);
 				xSemaphoreGive(xMutex_CubeProj);
 			}
 
@@ -1369,13 +1618,31 @@ void monitorCube(void *monitorPtr)
 				int start = cubeVar.cubeEdges[i][0];
 				int end = cubeVar.cubeEdges[i][1];
 				display.drawLine(
-					projectedVertices[start][0], projectedVertices[start][1],
-					projectedVertices[end][0], projectedVertices[end][1],
+					cubeProjectedVertices[start][0], cubeProjectedVertices[start][1],
+					cubeProjectedVertices[end][0], cubeProjectedVertices[end][1],
 					SSD1306_WHITE);
 			}
 
-			// display.setCursor(centerX, centerY);
-  			// display.print(F(timeBuffer));
+			// Draw the clock
+
+			// if (xSemaphoreTake(xMutex_ClockProj, portMAX_DELAY) == pdTRUE)
+			// {
+			// 	for (int i = 0; i < nDigitInClock; i++)
+			// 	{
+			// 		memcpy( clockProjectedVertices[i],clockProjected[i], sizeof(int) * nVerticeInDigit * 2);
+			// 	}
+			// 	xSemaphoreGive(xMutex_ClockProj);
+			// }
+
+			// for (int i = 0; i < nedgeTab[digitalClock.digits[0].number]; i++)
+			// {
+			// 	int start = digitalClock.digits[0].edges[i][0];
+			// 	int end = digitalClock.digits[0].edges[i][1];
+			// 	display.drawLine(
+			// 		clockProjectedVertices[0][start][0], clockProjectedVertices[0][start][1],
+			// 		clockProjectedVertices[0][end][0], clockProjectedVertices[0][end][1],
+			// 		SSD1306_WHITE);
+			// }
 
 			// Update the screen
 			display.display();
@@ -1423,7 +1690,7 @@ void monitorCube(void *monitorPtr)
 //   {
 //     unsigned long currentMillis = millis();
 //     // Incrémentation locale du temps
-//     localSeconds += (currentMillis - lastMillis) / 1000; 
+//     localSeconds += (currentMillis - lastMillis) / 1000;
 //     lastMillis = currentMillis;
 
 //     // Calcul HH:MM:SS (UTC dans cet exemple)
@@ -1449,13 +1716,24 @@ void monitorCube(void *monitorPtr)
 //   }
 // }
 
+// main loop :
+
 // init
 SRTL srtl;
+
+SET_LOOP_TASK_STACK_SIZE(MINIMAL_STACK_SIZE * 10);
 
 void setup()
 {
 	Serial.begin(115200);
 	Serial.println(F("In Setup function"));
+
+
+	esp_log_level_set("*", ESP_LOG_ERROR);  // Activer tous les logs
+	esp_log_level_set("*", ESP_LOG_WARN);  // Activer tous les logs
+	// esp_log_level_set("I2C", ESP_LOG_ERROR);  // Log uniquement les erreurs pour I2C
+
+	log_e("test");
 
 	// Enregistrement des ressources partagées
 	uint8_t var1Index = srtl.registerSharedResource(protected_var1);
@@ -1467,37 +1745,46 @@ void setup()
 	uint8_t varCubeIndex = srtl.registerSharedResource(protected_cube);
 	uint8_t varCubeProjIndex = srtl.registerSharedResource(protected_cube_projection);
 
+	uint8_t varClockIndex = srtl.registerSharedResource(protected_clock);
+	uint8_t varClockProjIndex = srtl.registerSharedResource(protected_clock_projection);
+
 	uint32_t consumerBits = 0;
 	uint32_t producerBits = 0;
 	uint32_t otherBits = 0;
 
-	otherBits |= INDEX_TO_BITSET(srtl.registerModule(test, "test", MINIMAL_STACK_SIZE , 5, 0x00, 200, NULL));
+
+	otherBits |= INDEX_TO_BITSET(srtl.registerModule(test, "test", MINIMAL_STACK_SIZE, 5, 0x00, 200, NULL));
 
 	// Enregistrement des modules producteurs
-	producerBits |= INDEX_TO_BITSET(srtl.registerModule(producer1, "P1", MINIMAL_STACK_SIZE , 1, 0x00, 200, NULL));
-	producerBits |= INDEX_TO_BITSET(srtl.registerModule(producer2, "P2", MINIMAL_STACK_SIZE , 1, 0x00, 200, NULL));
-	producerBits |= INDEX_TO_BITSET(srtl.registerModule(producer3, "P3", MINIMAL_STACK_SIZE , 1, 0x00, 200, NULL));
-	producerBits |= INDEX_TO_BITSET(srtl.registerModule(producer4, "P4", MINIMAL_STACK_SIZE , 1, 0x00, 200, NULL));
+	producerBits |= INDEX_TO_BITSET(srtl.registerModule(producer1, "P1", MINIMAL_STACK_SIZE, 1, 0x00, 200, NULL));
+	producerBits |= INDEX_TO_BITSET(srtl.registerModule(producer2, "P2", MINIMAL_STACK_SIZE, 1, 0x00, 200, NULL));
+	producerBits |= INDEX_TO_BITSET(srtl.registerModule(producer3, "P3", MINIMAL_STACK_SIZE * 2, 1, 0x00, 200, NULL));
+	producerBits |= INDEX_TO_BITSET(srtl.registerModule(producer4, "P4", MINIMAL_STACK_SIZE * 2, 1, 0x00, 200, NULL));
 
-	// // Enregistrement des modules consommateurs
-	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer1, "C1", MINIMAL_STACK_SIZE , 1, (1 << var1Index), 200, NULL));								// Intérêt pour var1
-	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer2, "C2", MINIMAL_STACK_SIZE , 1, (1 << var2Index), 200, NULL));								// Intérêt pour var2
-	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer3, "C3", MINIMAL_STACK_SIZE , 1, (1 << var1Index) | (1 << var2Index), 200, NULL));			// Intérêt pour var1 et var2
-	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer31, "consummer31", MINIMAL_STACK_SIZE *2, 2, (1 << var1Index) | (1 << var2Index), 200, NULL)); // Intérêt pour var1 et var2
-	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer4, "C4", MINIMAL_STACK_SIZE , 1, (1 << vardataIndex), 200, NULL));							// Intérêt pour vardata
+	// // // Enregistrement des modules consommateurs
+	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer1, "C1", MINIMAL_STACK_SIZE, 1, (1 << var1Index), 200, NULL));									 // Intérêt pour var1
+	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer2, "C2", MINIMAL_STACK_SIZE, 1, (1 << var2Index), 200, NULL));									 // Intérêt pour var2
+	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer3, "C3", MINIMAL_STACK_SIZE * 2, 1, (1 << var1Index) | (1 << var2Index), 200, NULL));				 // Intérêt pour var1 et var2
+	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer31, "consummer31", MINIMAL_STACK_SIZE * 3, 2, (1 << var1Index) | (1 << var2Index), 200, NULL)); // Intérêt pour var1 et var2
+	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer4, "C4", MINIMAL_STACK_SIZE, 1, (1 << vardataIndex), 200, NULL));								 // Intérêt pour vardata
 
-	// Enregistrer les modules producteurs
-	srtl.registerModule(replicatorA, "ReplicatorA", MINIMAL_STACK_SIZE * 2, 1, (1 << varReplicatedIndex), 200, NULL);
-	srtl.registerModule(replicatorB, "ReplicatorB", MINIMAL_STACK_SIZE * 2, 1, (1 << varReplicatedIndex), 200, NULL);
+	// // Enregistrer les modules producteurs
+	// srtl.registerModule(replicatorA, "ReplicatorA", MINIMAL_STACK_SIZE * 2, 1, (1 << varReplicatedIndex), 200, NULL);
+	// srtl.registerModule(replicatorB, "ReplicatorB", MINIMAL_STACK_SIZE * 2, 1, (1 << varReplicatedIndex), 200, NULL);
 
 	// TEST CUBE
 
 	cubeProjectSharedID = varCubeProjIndex;
 	otherBits |= INDEX_TO_BITSET(srtl.registerModule(cubeTask, "Cube_compute", MINIMAL_STACK_SIZE * 2, 3, 0x00, 50, &cubeProjectSharedID));
 
-	// MONITOR 
+	// TEST CLOCK
 
-	srtl.registerMonitor(monitorCube, "OLED_Sreen", MINIMAL_STACK_SIZE * 2 , 3, 50, NULL);
+	// otherBits |= INDEX_TO_BITSET(srtl.registerModule(digitalClockTask, "Clock_compute", MINIMAL_STACK_SIZE * 2, 3, 0x00, 50, &varClockProjIndex));
+
+	// MONITOR
+
+
+	srtl.registerMonitor(monitorCube, "OLED_Sreen", MINIMAL_STACK_SIZE * 7,  (configMAX_PRIORITIES - 1), 50, NULL);
 	if (srtl.sysMonitor.handle != NULL)
 	{
 		Serial.printf("Monitor Handle: %p Interest: 0x%X\n", srtl.sysMonitor.handle, srtl.sysMonitor.ressourceOfInterest);
@@ -1510,11 +1797,13 @@ void setup()
 
 	srtl.registerController(joystickSW, joysticksw_param, joystickVR, joystickvr_param, 20, NULL);
 
-	PinControllerParam customController_param[MAX_DIGITALPIN_IN_CONTROLLER] = {{15, INPUT_PULLDOWN, CHANGE}, {27, INPUT_PULLDOWN, CHANGE}, {0, 0, 0}};
-	srtl.registerController(customDigitalController, customController_param, NULL, NULL, 0, NULL);
+	// PinControllerParam customController_param[MAX_DIGITALPIN_IN_CONTROLLER] = {{15, INPUT_PULLDOWN, CHANGE}, {27, INPUT_PULLDOWN, CHANGE}, {0, 0, 0}};
+	// srtl.registerController(customDigitalController, customController_param, NULL, NULL, 0, NULL);
 
 	// srtl.registerModule(syncTimeHandler, "SYNCTIME", MINIMAL_STACK_SIZE, 1, 0x0, 200, NULL);
-	
+
+
+
 	// JOIN
 
 	// assert(consumerBits == 0b1111100000);
@@ -1531,11 +1820,17 @@ void setup()
 	{
 		Serial.printf("wait 0 : %s, wait 1 :%s\n", TO_BIN(released), TO_BIN(srtl.joinList[1]));
 	} // ALL producer are ready and consummer are waiting
-	released = srtl.unjoin(1, 4);
+	// released = srtl.unjoin(1, 4);
 	Serial.printf("Producer  %d leave barrier 1\n", released);
+
+
 	delay(1000);
+	Serial.print("Stack size setup: ");
+    Serial.println(uxTaskGetStackHighWaterMark(NULL));
+
 	released = srtl.release(1);
 	Serial.printf("Producer Released %s\n", TO_BIN(released));
+
 	while (srtl.sysMonitor.handle == NULL)
 	{
 		Serial.printf("wait 2 %s\n", TO_BIN(srtl.joinList[2]));
@@ -1545,14 +1840,14 @@ void setup()
 
 	// DEBUG
 
-	// Affichage des modules enregistrés
-	for (int i = 0; i < srtl.nModule; i++)
-	{
-		if (srtl.moduleList[i].handle != NULL)
-		{
-			Serial.printf("Module %d Handle: %p Interest: 0x%X\n", i, srtl.moduleList[i].handle, srtl.moduleList[i].ressourceOfInterest);
-		}
-	}
+	// // Affichage des modules enregistrés
+	// for (int i = 0; i < srtl.nModule; i++)
+	// {
+	// 	if (srtl.moduleList[i].handle != NULL)
+	// 	{
+	// 		Serial.printf("Module %d Handle: %p Interest: 0x%X\n", i, srtl.moduleList[i].handle, srtl.moduleList[i].ressourceOfInterest);
+	// 	}
+	// }
 
 	// // Affichage des controllers
 	// for (int i = 0; i < srtl.nController; i++)
@@ -1578,10 +1873,7 @@ void setup()
 	// 	}
 	// }
 
-
 	monitorStack(srtl);
-	monitorHeap();
-	Serial.printf("Program size: %d \n", ESP.getSketchSize());
 	printMemoryStats();
 }
 

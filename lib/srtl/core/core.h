@@ -41,7 +41,6 @@ struct SRTL;
 #define NBITS_WHO MAX_SHARED_RESOURCES // Nombre de bits pour coder les ressources partagées dans une notification
 #define NBITS_FREE N_FREE_BITS         // Nombre de bits libres pour des notifications personnalisées
 
-
 #define MINIMAL_STACK_SIZE 2048 // Taille minimale de la pile pour les tâches
 
 // Vérification de la somme des bits
@@ -85,7 +84,7 @@ char binaryBuffer[33];
 // MACRO INSIDE MODULE HANDLER
 
 #define GET_SRTL_INSTANCE ((*((Module *)modulePtr)->parent))
-#define GET_PARAMS_INSTANCE(type)  (*(type*)(((Module *)modulePtr)->parameters))
+#define GET_PARAMS_INSTANCE(type) (*(type *)(((Module *)modulePtr)->parameters))
 #define GET_CURRENT_MODULE_INSTANCE (*((Module *)modulePtr))
 #define GET_CURRENT_MODULE_INDEX (ARRAY_INDEX_FROM_PTR(GET_SRTL_INSTANCE.moduleList, (Module *)modulePtr))
 
@@ -93,16 +92,17 @@ char binaryBuffer[33];
 // extern "C" {
 // #endif
 
-// Déclarations C-only (compatibles C et C++)
-typedef struct {
+// Module struct (task with some information) (compatibles C et C++)
+typedef struct
+{
     TaskHandle_t handle;          // Handle de la tâche
     uint32_t ressourceOfInterest; // Ressource d'intérêt (bitmask)
     uint32_t taskFrequency;       // Fréquence d'exécution de la tâche
     uint32_t notificationValue;   // Valeur de notification
-    void* parameters;             // Paramètres de la tâche
+    void *parameters;             // Paramètres de la tâche
 #ifndef C_ONLY
-    struct SRTL* parent;          // Pointeur vers l'objet SRTL parent
-#endif // !C_ONLY
+    struct SRTL *parent; // Pointeur vers l'objet SRTL parent
+#endif                   // !C_ONLY
 } Module;
 
 // #ifdef __cplusplus
@@ -190,24 +190,43 @@ static inline uint8_t registerModule(TaskFunction_t taskFunction, const char *na
 
 #endif
 
+#define MAX_SEMAPHORE_MUTEX 16
+uint8_t nSemaphoreMutexBuffer = 0;
+StaticSemaphore_t semaphoreMutexBufferList[MAX_SEMAPHORE_MUTEX] = {NULL};
+
 /**
  * @brief Crée une ressource partagée dans le système.
- *
  * @param resource Pointeur vers la ressource partagée.
  * @param mutex Mutex pour la ressource.
  * @param valueLocation Adresse de la ressource.
  */
 inline void createSharedResource(void **resource, SemaphoreHandle_t *mutex, void *valueLocation)
 {
-    *resource = valueLocation;
-    *mutex = xSemaphoreCreateMutex();
-
-    if (mutex == NULL)
+    if (resource == NULL || mutex == NULL)
     {
-        // Serial.println("Failed to create mutex for resource");
+        Serial.println("Invalid arguments to createSharedResource");
         while (1)
-            ; // Blocage en cas d'échec
+            ;
     }
+    if (nSemaphoreMutexBuffer >= MAX_SEMAPHORE_MUTEX)
+    {
+        Serial.println("Semaphore buffer exhausted");
+        while (1)
+            ;
+    }
+
+    *resource = valueLocation;
+    // version statique
+    *mutex = xSemaphoreCreateMutexStatic(&semaphoreMutexBufferList[nSemaphoreMutexBuffer++]);
+    // *mutex = xSemaphoreCreateMutex(); // version dynamique
+
+    if (*mutex == NULL)
+    {
+        Serial.println("Failed to create mutex for resource");
+        while (1)
+            ;
+    }
+
 }
 #ifdef C_ONLY
 /**
@@ -276,7 +295,6 @@ inline SemaphoreHandle_t SRTLinit()
     return xMutex_NotifyAll = xSemaphoreCreateMutex();
 }
 
-
 // JOIN LIST : pseudo barrier for intermodule sync
 // TODO : add more module (use uint32_t but due to splitting 32 bit to Module and SharedResource ... see NOTIFY_MSG uses)
 
@@ -287,7 +305,8 @@ extern uint32_t joinList[MAX_JOIN_LIST] = {0};
 // Barriere join from a handler (No FRTOS thread pause) Awaiting release
 // Bloc executing handler into this function, set the module idx into the specified joinList of awaiting module
 // Return Released Modules
-inline uint32_t join(uint8_t joinListIndex,uint8_t modulePtrIndex){
+inline uint32_t join(uint8_t joinListIndex, uint8_t modulePtrIndex)
+{
     xSemaphoreTake(xMutex_JoinList, portMAX_DELAY);
 
     joinList[joinListIndex] |= (1 << modulePtrIndex);
@@ -295,39 +314,33 @@ inline uint32_t join(uint8_t joinListIndex,uint8_t modulePtrIndex){
     xSemaphoreGive(xMutex_JoinList);
 
     uint32_t ret;
-    xTaskNotifyWait(0x0,0x0,&ret,portMAX_DELAY);
+    xTaskNotifyWait(0x0, 0x0, &ret, portMAX_DELAY);
 
     return ret;
 }
 
 // Release Module blocked at the Barrier, use with join
 // Return Released Modules
-inline uint32_t release(uint8_t joinListIndex){
+inline uint32_t release(uint8_t joinListIndex)
+{
 
     uint32_t releasedModule = joinList[joinListIndex];
-    
+
     uint8_t i = 0;
 
     xSemaphoreTake(xMutex_JoinList, portMAX_DELAY);
     while (i < MAX_MODULES)
     {
-        if(releasedModule << i) xTaskNotify(moduleList[i].handle,releasedModule,eNoAction);
+        if (releasedModule << i)
+            xTaskNotify(moduleList[i].handle, releasedModule, eNoAction);
         i++;
     }
     joinList[joinListIndex] = 0;
     xSemaphoreGive(xMutex_JoinList);
-    
+
     return releasedModule;
 }
 
-
-
-
-
 #endif
-
-
-
-
 
 #endif // SRTL_CORE_H
