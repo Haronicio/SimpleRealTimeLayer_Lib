@@ -1,4 +1,15 @@
-// #define LOG_LOCAL_LEVEL ESP_LOG_ERROR
+#define LOG_LOCAL_LEVEL ESP_LOG_ERROR
+
+/*
+	Debug backtrace :
+	cd C:\Users\haron\.platformio\packages\toolchain-xtensa-esp32\bin
+	.\xtensa-esp32-elf-addr2line -pfiaC -e "C:\Users\haron\Documents\PlatformIO\Projects\SimpleRealTimeLayer_Lib\.pio\build\esp32doit-devkit-v1\firmware.elf" <backtrace>
+*/
+
+#define configCHECK_FOR_STACK_OVERFLOW 2
+#define configUSE_MALLOC_FAILED_HOOK 1
+
+
 #include <Arduino.h>
 #include <srtl.h>
 
@@ -9,17 +20,6 @@
 
 #include <esp_log.h>
 
-
-
-/*
-Debug 
-cd C:\Users\haron\.platformio\packages\toolchain-xtensa-esp32\bin
-.\xtensa-esp32-elf-addr2line -pfiaC -e "C:\Users\haron\Documents\PlatformIO\Projects\SimpleRealTimeLayer_Lib\.pio\build\esp32doit-devkit-v1\firmware.elf" backtrace
-*/
-
-#define configCHECK_FOR_STACK_OVERFLOW 2
-#define configUSE_MALLOC_FAILED_HOOK 1
-
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
    	log_e("Stack overflow in task: %s\n", pcTaskName);
     while (1);
@@ -29,7 +29,6 @@ void vApplicationMallocFailedHook(void) {
     log_e("Heap allocation failed!");
     while (1);
 }
-
 
 // #define configTOTAL_HEAP_SIZE ((1024) * (128))
 

@@ -85,6 +85,7 @@ The current implementation focuses on the **CORE** and **IHM** module, which all
 
 ---
 
+
 ## Contributing
 
 Contributions to the project are welcome! Please fork the repository, make your changes, and submit a pull request. We encourage the community to help improve the system, lighten and accelerate it.
