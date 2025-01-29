@@ -987,8 +987,8 @@ void producer4(void *modulePtr)
 
 		// Serial.printf("test %d\n",xMutex_var2->uxItemSize);
 
-		if (GET_SRTL_INSTANCE.notifyAll(0b1000, 0b100, eSetValueWithoutOverwrite))
-			Serial.println(F("Producer4"));
+		// if (GET_SRTL_INSTANCE.notifyAll(0b1000, 0b100, eSetValueWithoutOverwrite))
+		// 	Serial.println(F("Producer4"));
 
 		vTaskDelay(pdMS_TO_TICKS(50)); // Delay for 1000ms
 	}
@@ -1361,154 +1361,6 @@ void cubeTask(void *modulePtr)
 	}
 }
 
-const uint8_t nedgeTab[10] = {6, 2, 5, 5, 4, 5, 5, 3, 7, 5};
-
-struct Digit
-{
-
-	float angleX = 0;
-	float angleY = 0;
-	float angleZ = 0;
-	float rotationSpeed = 1;
-	uint8_t pixelScale = 10;
-
-	uint8_t number; // Le chiffre (0 à 9)
-	/*
-								x		y			0 : 0->1->3->5->4->2->0
-													1 : 1->3->5
-			0---1          	0 : -0.5	-1          2 : 0->1->3->2->4->5
-			|   |			1 : 0.5		-1          3 : 0->1->3->5->4 et 3->2
-			2---3			2 : -0.5	0			4 : 0->2->3->5
-			|   |			3 : 0.5		0			5 : 1->0->2->3->5->4
-			4---5           4 : -0.5	1			6 : 1->0->2->3->5->4->2
-							5 : 0.5		1			7 : 0->1->3->5
-													8 : 0->1->3->2->0 et 2->3->5->4->2
-													9 : 4->5->3->1->0->2->3
-	*/
-
-	float vertices[6][3] = {
-		{-0.5, -1, 0},
-		{0.5, -1, 0},
-		{-0.5, 0, 0},
-		{0.5, 0, 0},
-		{-0.5, 1, 0},
-		{0.5, 1, 0}};
-	uint8_t edges[7][3] = {0};
-
-	// Fonction pour définir les edges en fonction du digit
-	void setDigit(uint8_t num)
-	{
-		number = num;
-
-		switch (num)
-		{
-		case 0:
-			edges[0][0] = 0;
-			edges[0][1] = 1;
-			edges[1][0] = 1;
-			edges[1][1] = 3;
-			edges[2][0] = 3;
-			edges[2][1] = 5;
-			edges[3][0] = 5;
-			edges[3][1] = 4;
-			edges[4][0] = 4;
-			edges[4][1] = 2;
-			edges[5][0] = 2;
-			edges[5][1] = 0;
-			break;
-
-		case 1:
-			edges[0][0] = 1;
-			edges[0][1] = 3;
-			edges[1][0] = 3;
-			edges[1][1] = 5;
-			break;
-
-		case 8:
-			edges[0][0] = 0;
-			edges[0][1] = 1;
-			edges[1][0] = 1;
-			edges[1][1] = 3;
-			edges[2][0] = 3;
-			edges[2][1] = 2;
-			edges[3][0] = 2;
-			edges[3][1] = 4;
-			edges[4][0] = 4;
-			edges[4][1] = 5;
-			edges[5][0] = 5;
-			edges[5][1] = 0;
-			break;
-
-		default:
-			break;
-		}
-	}
-};
-
-struct DigitalClock
-{
-	struct Digit digits[6];
-} digitalClock;
-
-SemaphoreHandle_t xMutex_digitalClockVar;
-protected_data_t protected_clock = {&xMutex_digitalClockVar, (void *)&digitalClock};
-
-int clockProjected[6][6][2];
-SemaphoreHandle_t xMutex_ClockProj;
-protected_data_t protected_clock_projection = {&xMutex_ClockProj, (void *)&clockProjected};
-
-// void digitalClockTask(void *modulePtr)
-// {
-// 	const uint8_t nDigitInClock = 6;
-// 	const uint8_t nVerticeInDigit = 6;
-
-// 	// local variables
-// 	float transformedVertices[nDigitInClock][nVerticeInDigit][3];
-// 	int projectedVertices[nDigitInClock][nVerticeInDigit][2];
-
-// 	digitalClock.digits[0].setDigit(0);
-
-// 	Serial.println("Clock Begin");
-
-// 	GET_SRTL_INSTANCE.join(2, GET_CURRENT_MODULE_INDEX);
-// 	for (;;)
-// 	{
-
-// 		//  Rotate and project each vertex for each digits
-// 		for (int i = 0; i < nDigitInClock; i++)
-// 		{
-// 			for (int j = 0; j < nVerticeInDigit; j++)
-// 			{
-// 				rotateVertex(digitalClock.digits[i].vertices[j], transformedVertices[i][j]);
-// 				projectVertex(transformedVertices[i][j], projectedVertices[i][j][0], projectedVertices[i][j][1]);
-// 			}
-// 		}
-
-// 		// Increment rotation angles depending on controller 0 (joystick)
-// 		if (xSemaphoreTake(xMutex_digitalClockVar, portMAX_DELAY) == pdTRUE)
-// 		{
-// 			for (int i = 0; i < nDigitInClock; i++)
-// 			{
-// 				digitalClock.digits[i].angleX = mapFloat(GET_SRTL_INSTANCE.controllerList[0].analogPinStates[0], 0, 4095, -PI / 2, PI / 2) * digitalClock.digits[i].rotationSpeed;
-// 				digitalClock.digits[i].angleY = mapFloat(GET_SRTL_INSTANCE.controllerList[0].analogPinStates[1], 0, 4095, PI / 2, -PI / 2) * digitalClock.digits[i].rotationSpeed;
-// 			}
-// 			xSemaphoreGive(xMutex_digitalClockVar);
-// 		}
-
-// 		// store new Value of projection and send it to Monitor
-// 		if (xSemaphoreTake(xMutex_ClockProj, portMAX_DELAY) == pdTRUE)
-// 		{
-// 			for (int i = 0; i < nDigitInClock; i++)
-// 			{
-// 				memcpy(clockProjected[i], projectedVertices[i], sizeof(int) * nVerticeInDigit * 2);
-// 				GET_SRTL_INSTANCE.notifyMonitor(GET_CURRENT_MODULE_INDEX, GET_PARAMS_INSTANCE(int), eSetBits);
-// 			}
-// 			xSemaphoreGive(xMutex_ClockProj);
-// 		}
-// 		vTaskDelay(pdMS_TO_TICKS(25));
-// 	}
-// }
-
 void IRAM_ATTR customDigitalController(void *controllerPtr)
 {
 
@@ -1544,21 +1396,6 @@ void IRAM_ATTR joystickVR(TimerHandle_t xTimer)
 	controllerPtr->analogPinStates[1] = pinState;
 }
 
-// // WiFi credentials
-// const char *ssid = "Freebox-022439";
-// const char *password = "SebastienSexy7";
-
-// // NTP settings
-// WiFiUDP ntpUDP;
-// NTPClient timeClient(ntpUDP, "pool.ntp.org", 3600, 60000); // UTC+1 (3600s), update every 60s
-
-// // Variables for maintaining local time
-// static unsigned long localSeconds = 0;
-// static unsigned long lastMillis   = 0;
-// static unsigned long lastSyncMillis = 0;
-
-// char timeBuffer[10] = {'\0'};
-
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 
 void monitorCube(void *monitorPtr)
@@ -1569,8 +1406,6 @@ void monitorCube(void *monitorPtr)
 		for (;;);
 	}
 
-	// display.ssd1306_command(SSD1306_MEMORYMODE); // Commande pour changer le mode mémoire
-	// display.ssd1306_command(0x00);    // Passer en mode horizontal
 
 	Serial.print("Stack size monitor: ");
     Serial.println(uxTaskGetStackHighWaterMark(NULL));
@@ -1591,10 +1426,6 @@ void monitorCube(void *monitorPtr)
 	Monitor currentModule = *((Monitor *)monitorPtr);
 	currentModule.notificationValue = 0;
 	int cubeProjectedVertices[8][2];
-
-	// const u_int8_t nDigitInClock = 6;
-	// const u_int8_t nVerticeInDigit = 6;
-	// int clockProjectedVertices[6][6][2];
 
 	Serial.println("Monitor Begin");
 
@@ -1623,27 +1454,6 @@ void monitorCube(void *monitorPtr)
 					SSD1306_WHITE);
 			}
 
-			// Draw the clock
-
-			// if (xSemaphoreTake(xMutex_ClockProj, portMAX_DELAY) == pdTRUE)
-			// {
-			// 	for (int i = 0; i < nDigitInClock; i++)
-			// 	{
-			// 		memcpy( clockProjectedVertices[i],clockProjected[i], sizeof(int) * nVerticeInDigit * 2);
-			// 	}
-			// 	xSemaphoreGive(xMutex_ClockProj);
-			// }
-
-			// for (int i = 0; i < nedgeTab[digitalClock.digits[0].number]; i++)
-			// {
-			// 	int start = digitalClock.digits[0].edges[i][0];
-			// 	int end = digitalClock.digits[0].edges[i][1];
-			// 	display.drawLine(
-			// 		clockProjectedVertices[0][start][0], clockProjectedVertices[0][start][1],
-			// 		clockProjectedVertices[0][end][0], clockProjectedVertices[0][end][1],
-			// 		SSD1306_WHITE);
-			// }
-
 			// Update the screen
 			display.display();
 		}
@@ -1651,70 +1461,6 @@ void monitorCube(void *monitorPtr)
 		vTaskDelay(pdMS_TO_TICKS(50));
 	}
 }
-
-// inline void syncTime()
-// {
-//   Serial.println("Syncing time with NTP...");
-//   while (!timeClient.update())
-//   {
-//     timeClient.forceUpdate();
-//   }
-//   localSeconds = timeClient.getEpochTime();
-//   Serial.println("Time synchronized!");
-// }
-
-// void syncTimeHandler(void * modulePtr)
-// {
-//   // Connexion WiFi
-//   WiFi.begin(ssid, password);
-//   Serial.print("Connecting to WiFi");
-//   while (WiFi.status() != WL_CONNECTED)
-//   {
-//     delay(500);
-//     Serial.print(".");
-//   }
-//   Serial.println("\nConnected!");
-
-//   // Démarrage du client NTP
-//   timeClient.begin();
-
-//   // Première synchro
-//   syncTime();
-
-//   lastMillis = millis();
-//   lastSyncMillis = lastMillis;
-
-//   GET_SRTL_INSTANCE.join(2, GET_CURRENT_MODULE_INDEX);
-
-//   for (;;)
-//   {
-//     unsigned long currentMillis = millis();
-//     // Incrémentation locale du temps
-//     localSeconds += (currentMillis - lastMillis) / 1000;
-//     lastMillis = currentMillis;
-
-//     // Calcul HH:MM:SS (UTC dans cet exemple)
-//     unsigned long secondsInDay = localSeconds % 86400; // Secondes depuis minuit
-//     int hours   = secondsInDay / 3600;
-//     int minutes = (secondsInDay % 3600) / 60;
-//     int sec     = secondsInDay % 60;
-
-//     sprintf(timeBuffer, "%02d:%02d:%02d", hours, minutes, sec);
-
-//     // Affichage
-// 	GET_SRTL_INSTANCE.notifyMonitor(GET_CURRENT_MODULE_INDEX, GET_PARAMS_INSTANCE(int), eSetBits);
-//     Serial.printf("time : %s\n", timeBuffer);
-
-//     // Re-sync toutes les 24h avec un intervalle plutôt qu'un modulo
-//     if (currentMillis - lastSyncMillis >= 86400000UL) { // 24 heures
-//       lastSyncMillis = currentMillis;
-//       syncTime();
-//     }
-
-//     // Attente 500 ms avant la prochaine mise à jour
-//     vTaskDelay(pdMS_TO_TICKS(500));
-//   }
-// }
 
 // main loop :
 
@@ -1735,6 +1481,12 @@ void setup()
 
 	log_e("test");
 
+	if (!syncWifiInit("Freebox-022439", "SebastienSexy7")) {
+        Serial.println("Failed to connect to WiFi.");
+        return;
+    }
+	Serial.print(SYNC_SYSTIME_CONFIG);
+
 	// Enregistrement des ressources partagées
 	uint8_t var1Index = srtl.registerSharedResource(protected_var1);
 	uint8_t var2Index = srtl.registerSharedResource(protected_var2);
@@ -1744,9 +1496,6 @@ void setup()
 
 	uint8_t varCubeIndex = srtl.registerSharedResource(protected_cube);
 	uint8_t varCubeProjIndex = srtl.registerSharedResource(protected_cube_projection);
-
-	uint8_t varClockIndex = srtl.registerSharedResource(protected_clock);
-	uint8_t varClockProjIndex = srtl.registerSharedResource(protected_clock_projection);
 
 	uint32_t consumerBits = 0;
 	uint32_t producerBits = 0;
@@ -1769,20 +1518,15 @@ void setup()
 	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer4, "C4", MINIMAL_STACK_SIZE, 1, (1 << vardataIndex), 200, NULL));								 // Intérêt pour vardata
 
 	// // Enregistrer les modules producteurs
-	// srtl.registerModule(replicatorA, "ReplicatorA", MINIMAL_STACK_SIZE * 2, 1, (1 << varReplicatedIndex), 200, NULL);
-	// srtl.registerModule(replicatorB, "ReplicatorB", MINIMAL_STACK_SIZE * 2, 1, (1 << varReplicatedIndex), 200, NULL);
+	srtl.registerModule(replicatorA, "ReplicatorA", MINIMAL_STACK_SIZE * 2, 1, (1 << varReplicatedIndex), 200, NULL);
+	srtl.registerModule(replicatorB, "ReplicatorB", MINIMAL_STACK_SIZE * 2, 1, (1 << varReplicatedIndex), 200, NULL);
 
 	// TEST CUBE
 
 	cubeProjectSharedID = varCubeProjIndex;
 	otherBits |= INDEX_TO_BITSET(srtl.registerModule(cubeTask, "Cube_compute", MINIMAL_STACK_SIZE * 2, 3, 0x00, 50, &cubeProjectSharedID));
 
-	// TEST CLOCK
-
-	// otherBits |= INDEX_TO_BITSET(srtl.registerModule(digitalClockTask, "Clock_compute", MINIMAL_STACK_SIZE * 2, 3, 0x00, 50, &varClockProjIndex));
-
 	// MONITOR
-
 
 	srtl.registerMonitor(monitorCube, "OLED_Sreen", MINIMAL_STACK_SIZE * 7,  (configMAX_PRIORITIES - 1), 50, NULL);
 	if (srtl.sysMonitor.handle != NULL)
@@ -1800,14 +1544,11 @@ void setup()
 	// PinControllerParam customController_param[MAX_DIGITALPIN_IN_CONTROLLER] = {{15, INPUT_PULLDOWN, CHANGE}, {27, INPUT_PULLDOWN, CHANGE}, {0, 0, 0}};
 	// srtl.registerController(customDigitalController, customController_param, NULL, NULL, 0, NULL);
 
-	// srtl.registerModule(syncTimeHandler, "SYNCTIME", MINIMAL_STACK_SIZE, 1, 0x0, 200, NULL);
-
-
 
 	// JOIN
 
-	// assert(consumerBits == 0b1111100000);
-	// assert(producerBits == 0b11110);
+	assert(consumerBits == 0b1111100000);
+	assert(producerBits == 0b11110);
 
 	// Wait initialization of all task with join barriere consummers(11 1110 0000) : 0, producers(1 1110) : 1, cubetask : 2 (1 0000 0000 0000)
 	while (srtl.joinList[0] != consumerBits)
@@ -1840,38 +1581,47 @@ void setup()
 
 	// DEBUG
 
-	// // Affichage des modules enregistrés
-	// for (int i = 0; i < srtl.nModule; i++)
-	// {
-	// 	if (srtl.moduleList[i].handle != NULL)
-	// 	{
-	// 		Serial.printf("Module %d Handle: %p Interest: 0x%X\n", i, srtl.moduleList[i].handle, srtl.moduleList[i].ressourceOfInterest);
-	// 	}
-	// }
+	// Affichage des modules enregistrés
+	Serial.println("================ MODULE LIST ===================");
+	for (int i = 0; i < srtl.nModule; i++)
+	{
+		if (srtl.moduleList[i].handle != NULL)
+		{
+			Serial.printf("Module %d Handle: %p Interest: 0x%X\n", i, srtl.moduleList[i].handle, srtl.moduleList[i].ressourceOfInterest);
+		}
+	}
+	Serial.println("================ ============== ===================");
+	Serial.println("\n\n\n");
 
-	// // Affichage des controllers
-	// for (int i = 0; i < srtl.nController; i++)
-	// {
-	// 	if ((srtl.controllerList[i].digitalHandler != NULL))
-	// 	{
-	// 		Serial.printf("Controller digital %d Handle: %p Pin initialized ===> : \n", i, srtl.controllerList[i].digitalHandler);
+	// Affichage des controllers
+	Serial.println("================ CONTROLLER LIST ===================");
+	for (int i = 0; i < srtl.nController; i++)
+	{
+		if ((srtl.controllerList[i].digitalHandler != NULL))
+		{
+			Serial.printf("Controller digital %d Handle: %p Pin initialized ===> : \n", i, srtl.controllerList[i].digitalHandler);
 
-	// 		for (uint8_t j = 0; j < MAX_DIGITALPIN_IN_CONTROLLER; j++)
-	// 		{
-	// 			Serial.printf("\t\t\t Pin digital %d num: %d \n", i, srtl.controllerList[i].digitalPins[j].pin);
-	// 		}
-	// 	}
+			for (uint8_t j = 0; j < MAX_DIGITALPIN_IN_CONTROLLER; j++)
+			{
+				Serial.printf("\t\t\t Pin digital %d num: %d \n", i, srtl.controllerList[i].digitalPins[j].pin);
+			}
+		}
 
-	// 	if ((srtl.controllerList[i].analogHandler != NULL))
-	// 	{
-	// 		Serial.printf("Controller analog %d Handle: %p \tPin initialized ===> : \n", i, srtl.controllerList[i].analogHandler);
+		Serial.println("\n");
 
-	// 		for (uint8_t j = 0; j < MAX_ANALOGPIN_IN_CONTROLLER; j++)
-	// 		{
-	// 			Serial.printf("\t\t\t\t\t Pin digital %d num: %d \n", i, srtl.controllerList[i].analogPins[j].pin);
-	// 		}
-	// 	}
-	// }
+		if ((srtl.controllerList[i].analogHandler != NULL))
+		{
+			Serial.printf("Controller analog %d Handle: %p \tPin initialized ===> : \n", i, srtl.controllerList[i].analogHandler);
+
+			for (uint8_t j = 0; j < MAX_ANALOGPIN_IN_CONTROLLER; j++)
+			{
+				Serial.printf("\t\t\t\t\t Pin digital %d num: %d \n", i, srtl.controllerList[i].analogPins[j].pin);
+			}
+		}
+	}
+	Serial.println("================ ================= ===================");
+
+	Serial.println("\n\n\n");
 
 	monitorStack(srtl);
 	printMemoryStats();
@@ -1879,7 +1629,9 @@ void setup()
 
 void loop()
 {
-	// Main loop code (optional, as tasks will run independently)
+
+	Serial.println(-syncTimer(0));
+	vTaskDelay(pdMS_TO_TICKS(1000));
 }
 
 #endif

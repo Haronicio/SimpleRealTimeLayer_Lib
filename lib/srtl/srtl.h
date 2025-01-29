@@ -3,6 +3,7 @@
 
 #include "core/core.h"
 #include "ihm/ihm.h"
+#include "sync/sync.h"
 
 // #ifdef __cplusplus
 // extern "C" {
@@ -33,6 +34,10 @@ public: // TODO getter and setter
     uint8_t nController;
     Controller controllerList[MAX_CONTROLLER];
 
+    // SYNC
+
+    SemaphoreHandle_t xMutex_SyncTimer;
+
     // public:
     // Constructeur
     SRTL()
@@ -55,6 +60,11 @@ public: // TODO getter and setter
         if (this->xMutex_JoinList != nullptr)
         {
             vSemaphoreDelete(xMutex_JoinList);
+        }
+        // Détruire la sémaphore de SyncTimer
+        if (this->xMutex_SyncTimer != nullptr)
+        {
+            vSemaphoreDelete(xMutex_SyncTimer);
         }
 
         // Détruire les sémaphores des ressources partagées
@@ -81,6 +91,7 @@ public: // TODO getter and setter
     SemaphoreHandle_t init()
     {
         xMutex_JoinList = xSemaphoreCreateMutex();
+        xMutex_SyncTimer = xSemaphoreCreateMutex();
         return xMutex_NotifyAll = xSemaphoreCreateMutex();
     }
 
@@ -202,7 +213,7 @@ public: // TODO getter and setter
     // Release Module blocked at the Barrier, use with join
     // Clear the bit field
     // Return Released Modules Indexes
-    inline uint32_t release(uint8_t joinListIndex,uint8_t srcModuleIndex = 0)
+    inline uint32_t release(uint8_t joinListIndex, uint8_t srcModuleIndex = 0)
     {
         xSemaphoreTake(xMutex_JoinList, portMAX_DELAY);
         uint32_t releasedModule = joinList[joinListIndex];
@@ -219,7 +230,7 @@ public: // TODO getter and setter
                 }
                 else
                 {
-                    xTaskNotify(this->moduleList[i].handle,  NOTIFY_MSG(releasedModule, srcModuleIndex), eNoAction);
+                    xTaskNotify(this->moduleList[i].handle, NOTIFY_MSG(releasedModule, srcModuleIndex), eNoAction);
                 }
             }
         }
@@ -230,9 +241,9 @@ public: // TODO getter and setter
     }
 
     // specific case of release when free a specific module from the barrier
-    // return index of module released 
+    // return index of module released
     // UPDATE : same as other func
-    inline uint32_t unjoin(uint8_t joinListIndex, uint8_t modulePtrIndex,uint8_t srcModuleIndex = 0)
+    inline uint32_t unjoin(uint8_t joinListIndex, uint8_t modulePtrIndex, uint8_t srcModuleIndex = 0)
     {
         xSemaphoreTake(xMutex_JoinList, portMAX_DELAY);
         joinList[joinListIndex] &= ~(1 << modulePtrIndex);
@@ -247,6 +258,120 @@ public: // TODO getter and setter
         xTaskNotify(this->moduleList[modulePtrIndex].handle, NOTIFY_MSG(ret, srcModuleIndex), eNoAction);
         return ret;
     }
+
+    // SYNC
+
+    inline bool setupWiFi(const char *ssid, const char *passphrase = (const char *)__null)
+    {
+        return syncWifiInit(ssid, passphrase);
+    }
+
+    /*
+
+        The main concept of the autoTimer is to sleep until a precise date will reached,
+        Module expose the situation to other (I'm sleeping on this timer) and hold tick delay information
+        But EventTimer should not be shared (even with a proper protected_data_t) because syncTimer will created starvation or deadlock
+        return the event id if events in success or UINT8_MAX
+    */
+
+    inline uint8_t autoTimer(Module *modulePtr, eventTimer *events, uint8_t nEvent)
+    {
+
+        if (events == nullptr)
+        {
+            Serial.println("No timers specified");
+            return UINT8_MAX;
+        }
+
+        if (modulePtr == nullptr)
+        {
+            Serial.println("No module for timer");
+            return UINT8_MAX;
+        }
+
+        if (nEvent >= MAX_EVENTTIMER_IN_MODULE)
+        {
+            Serial.println("Too many timer");
+            return UINT8_MAX;
+        }
+
+
+
+        int32_t minDelta = INT32_MAX;
+        eventTimer *nextEvent = NULL;
+
+        // SyncTimer is a static function, calibration must be protected
+        xSemaphoreTake(xMutex_SyncTimer, portMAX_DELAY);
+        for (uint8_t i = 0; i < nEvent; i++)
+        {
+            if (events[i].flags & 1)
+            {
+
+                int32_t delta = syncTimer(events[i].time); //( > 0) futur ( < 0) past
+
+                if(delta < 1) //task is late
+                {
+                    /*
+                        doit q'éxécuté toutes les 15 secondes, il ne s'est pas éxécuté pendant 48 seconde (donc -48 )
+                        cela a équivaut à 48/15 ~ 3 fois manqué, donc la 4ème éxécution sera à l'heure, et la 3ème doit s'éxécuter maintenant
+                        s'il avait fait ces 3 fois manqué il aurait un peu de retard (3secondes), c'est celui ci qui est éxécuté immédiatement
+                    */
+                    uint32_t missedCount = getMissedEventCounts(&events[i]);
+                    events[i].time += events[i].period * missedCount;
+                    events[i].eventCount += missedCount;
+                    events[i].lastExecution =  events[i].time;
+                    delta = syncTimer(events[i].time); //( > 0) futur ( < 0) past
+                }
+
+                int32_t tmp = min(minDelta, delta);
+                if (tmp != minDelta)
+                {
+                    minDelta = tmp;
+                    nextEvent = &events[i];
+                }
+
+                // periodicity
+                if (GET_EVENT_TIMER_PERIOD(events[i].flags))
+                {
+                    events[i].time += events[i].period;
+                }
+               
+            }
+        }
+        xSemaphoreGive(xMutex_SyncTimer);
+
+        // TODO WARNING PROTECT THAT NOTE list head or nextactive ?
+        // modulePtr->lastEvents = events;
+        modulePtr->lastEvent = nextEvent;
+
+        if (nextEvent == NULL)
+        {
+            Serial.println("No valid event found, skipping sleep.");
+            return UINT8_MAX;
+        }
+
+        SET_EVENT_TIMER_ISNEXT(nextEvent->flags, 1);
+
+        if (minDelta > 1) //task is early
+        {
+            Serial.printf("Module %d sleep for %ld , ET %d\n", ARRAY_INDEX_FROM_PTR(this->moduleList, modulePtr), minDelta, GET_EVENT_TIMER_ID(nextEvent->flags));
+
+            // Sleep to reach next date (heavy time load measured ~ 1 sec)
+            vTaskDelayUntil(&modulePtr->lastAwake, pdMS_TO_TICKS(minDelta - MILLIS_TO_EPOCH(modulePtr->taskFrequency) + 1));
+        }
+        else //task is late
+            Serial.printf("Module %d execute immediatly  %ld , ET %d\n", ARRAY_INDEX_FROM_PTR(this->moduleList, modulePtr), minDelta, GET_EVENT_TIMER_ID(nextEvent->flags));
+
+        // lastExecution and count
+        nextEvent->lastExecution = nextEvent->time;
+        nextEvent->eventCount++;
+
+        return GET_EVENT_TIMER_ID(nextEvent->flags);
+    }
+
+    /*
+       modulePtr->lastEvents->lastExecution ~~ pdTICKS_TO_MILLIS(modulePtr->lastAwake)
+    */
 };
 
 #endif // !C_ONLY

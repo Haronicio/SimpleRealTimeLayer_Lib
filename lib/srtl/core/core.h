@@ -28,7 +28,9 @@
 #include <freertos/task.h>
 #include <freertos/semphr.h>
 
+//forward declaration of struct SRTL
 struct SRTL;
+struct eventTimer;
 
 // Configuration de base
 
@@ -99,10 +101,13 @@ typedef struct
     uint32_t ressourceOfInterest; // Ressource d'intérêt (bitmask)
     uint32_t taskFrequency;       // Fréquence d'exécution de la tâche
     uint32_t notificationValue;   // Valeur de notification
+    TickType_t lastAwake;         // Pour la gestion de réveil précis (autoTimer voir sync.h)
+    struct eventTimer *lastEvent;// Guarder la ref du dernier évènements
     void *parameters;             // Paramètres de la tâche
 #ifndef C_ONLY
     struct SRTL *parent; // Pointeur vers l'objet SRTL parent
 #endif                   // !C_ONLY
+
 } Module;
 
 // #ifdef __cplusplus
@@ -147,6 +152,8 @@ static inline void createModule(TaskFunction_t taskFunction, const char *name, u
     module->ressourceOfInterest = ressourceOfInterest;
     module->taskFrequency = taskFrequency;
     module->parameters = moduleparameters;
+    module->lastAwake = xTaskGetTickCount();
+    module->lastEvent = NULL;
 
     // moduleparameters in module, module adress in taskhandler parameters
     if (xTaskCreate(taskFunction, name, stackSize, module, priority, &module->handle) != pdPASS) // TODO : prefer Static Task alloc ?
