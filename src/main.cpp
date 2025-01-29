@@ -1053,8 +1053,8 @@ void consummer2(void *modulePtr)
 // wait 2 notification
 void consummer3(void *modulePtr)
 {
-	Module currentModule = *((Module *)modulePtr);
-	currentModule.notificationValue = 0;
+	Module * currentModule = ((Module *)modulePtr);
+	currentModule->notificationValue = 0;
 
 	float local_var1 = 0.0, local_var2 = 0.0;
 
@@ -1062,8 +1062,8 @@ void consummer3(void *modulePtr)
 	// Task implementation
 	for (;;)
 	{
-		if (xTaskNotifyWait(0xFFFFFFFF, 0x00, &currentModule.notificationValue, pdMS_TO_TICKS(250)) &&
-			((EXTRACT_SHARED_RESOURCE(currentModule.notificationValue) & 0x03) == 0x03))
+		if (xTaskNotifyWait(0xFFFFFFFF, 0x00, &currentModule->notificationValue, pdMS_TO_TICKS(250)) &&
+			((EXTRACT_SHARED_RESOURCE(currentModule->notificationValue) & 0x03) == 0x03))
 		{
 
 			xSemaphoreTake(xMutex_var1, portMAX_DELAY);
@@ -1083,18 +1083,18 @@ void consummer3(void *modulePtr)
 // read the first notification arrive
 void consummer31(void *modulePtr)
 {
-	Module currentModule = *((Module *)modulePtr);
-	currentModule.notificationValue = 0;
+	Module * currentModule = ((Module *)modulePtr);
+	currentModule->notificationValue = 0;
 	float local_var1 = 0.0, local_var2 = 0.0;
 
 	GET_SRTL_INSTANCE.join(0, GET_CURRENT_MODULE_INDEX);
 	// Task implementation
 	for (;;)
 	{
-		if (xTaskNotifyWait(0xFFFFFFFF, 0xFFFFFFFF, &currentModule.notificationValue, portMAX_DELAY))
+		if (xTaskNotifyWait(0xFFFFFFFF, 0xFFFFFFFF, &currentModule->notificationValue, portMAX_DELAY))
 		{
 			// Serial.printf(" src: 0x%08X \t\n", currentModule.notificationValue);
-			if ((EXTRACT_SHARED_RESOURCE(currentModule.notificationValue) & 0b1) == 0b1)
+			if ((EXTRACT_SHARED_RESOURCE(currentModule->notificationValue) & 0b1) == 0b1)
 			{
 				xSemaphoreTake(xMutex_var1, portMAX_DELAY);
 				local_var1 = *(float *)GET_SRTL_INSTANCE.sharedRessources[0];
@@ -1103,7 +1103,7 @@ void consummer31(void *modulePtr)
 				xSemaphoreGive(xMutex_var1);
 			}
 
-			if ((EXTRACT_SHARED_RESOURCE(currentModule.notificationValue) & 0b10) == 0b10)
+			if ((EXTRACT_SHARED_RESOURCE(currentModule->notificationValue) & 0b10) == 0b10)
 			{
 
 				xSemaphoreTake(xMutex_var2, portMAX_DELAY);
@@ -1113,7 +1113,7 @@ void consummer31(void *modulePtr)
 				xSemaphoreGive(xMutex_var2);
 			}
 
-			currentModule.notificationValue = 0;
+			currentModule->notificationValue = 0;
 		}
 		vTaskDelay(pdMS_TO_TICKS(200));
 	}
@@ -1456,57 +1456,57 @@ int clockProjected[6][6][2];
 SemaphoreHandle_t xMutex_ClockProj;
 protected_data_t protected_clock_projection = {&xMutex_ClockProj, (void *)&clockProjected};
 
-// void digitalClockTask(void *modulePtr)
-// {
-// 	const uint8_t nDigitInClock = 6;
-// 	const uint8_t nVerticeInDigit = 6;
+void digitalClockTask(void *modulePtr)
+{
+	const uint8_t nDigitInClock = 6;
+	const uint8_t nVerticeInDigit = 6;
 
-// 	// local variables
-// 	float transformedVertices[nDigitInClock][nVerticeInDigit][3];
-// 	int projectedVertices[nDigitInClock][nVerticeInDigit][2];
+	// local variables
+	float transformedVertices[nDigitInClock][nVerticeInDigit][3];
+	int projectedVertices[nDigitInClock][nVerticeInDigit][2];
 
-// 	digitalClock.digits[0].setDigit(0);
+	digitalClock.digits[0].setDigit(0);
 
-// 	Serial.println("Clock Begin");
+	Serial.println("Clock Begin");
 
-// 	GET_SRTL_INSTANCE.join(2, GET_CURRENT_MODULE_INDEX);
-// 	for (;;)
-// 	{
+	GET_SRTL_INSTANCE.join(2, GET_CURRENT_MODULE_INDEX);
+	for (;;)
+	{
 
-// 		//  Rotate and project each vertex for each digits
-// 		for (int i = 0; i < nDigitInClock; i++)
-// 		{
-// 			for (int j = 0; j < nVerticeInDigit; j++)
-// 			{
-// 				rotateVertex(digitalClock.digits[i].vertices[j], transformedVertices[i][j]);
-// 				projectVertex(transformedVertices[i][j], projectedVertices[i][j][0], projectedVertices[i][j][1]);
-// 			}
-// 		}
+		//  Rotate and project each vertex for each digits
+		for (int i = 0; i < nDigitInClock; i++)
+		{
+			for (int j = 0; j < nVerticeInDigit; j++)
+			{
+				rotateVertex(digitalClock.digits[i].vertices[j], transformedVertices[i][j]);
+				projectVertex(transformedVertices[i][j], projectedVertices[i][j][0], projectedVertices[i][j][1]);
+			}
+		}
 
-// 		// Increment rotation angles depending on controller 0 (joystick)
-// 		if (xSemaphoreTake(xMutex_digitalClockVar, portMAX_DELAY) == pdTRUE)
-// 		{
-// 			for (int i = 0; i < nDigitInClock; i++)
-// 			{
-// 				digitalClock.digits[i].angleX = mapFloat(GET_SRTL_INSTANCE.controllerList[0].analogPinStates[0], 0, 4095, -PI / 2, PI / 2) * digitalClock.digits[i].rotationSpeed;
-// 				digitalClock.digits[i].angleY = mapFloat(GET_SRTL_INSTANCE.controllerList[0].analogPinStates[1], 0, 4095, PI / 2, -PI / 2) * digitalClock.digits[i].rotationSpeed;
-// 			}
-// 			xSemaphoreGive(xMutex_digitalClockVar);
-// 		}
+		// Increment rotation angles depending on controller 0 (joystick)
+		if (xSemaphoreTake(xMutex_digitalClockVar, portMAX_DELAY) == pdTRUE)
+		{
+			for (int i = 0; i < nDigitInClock; i++)
+			{
+				digitalClock.digits[i].angleX = mapFloat(GET_SRTL_INSTANCE.controllerList[0].analogPinStates[0], 0, 4095, -PI / 2, PI / 2) * digitalClock.digits[i].rotationSpeed;
+				digitalClock.digits[i].angleY = mapFloat(GET_SRTL_INSTANCE.controllerList[0].analogPinStates[1], 0, 4095, PI / 2, -PI / 2) * digitalClock.digits[i].rotationSpeed;
+			}
+			xSemaphoreGive(xMutex_digitalClockVar);
+		}
 
-// 		// store new Value of projection and send it to Monitor
-// 		if (xSemaphoreTake(xMutex_ClockProj, portMAX_DELAY) == pdTRUE)
-// 		{
-// 			for (int i = 0; i < nDigitInClock; i++)
-// 			{
-// 				memcpy(clockProjected[i], projectedVertices[i], sizeof(int) * nVerticeInDigit * 2);
-// 				GET_SRTL_INSTANCE.notifyMonitor(GET_CURRENT_MODULE_INDEX, GET_PARAMS_INSTANCE(int), eSetBits);
-// 			}
-// 			xSemaphoreGive(xMutex_ClockProj);
-// 		}
-// 		vTaskDelay(pdMS_TO_TICKS(25));
-// 	}
-// }
+		// store new Value of projection and send it to Monitor
+		if (xSemaphoreTake(xMutex_ClockProj, portMAX_DELAY) == pdTRUE)
+		{
+			for (int i = 0; i < nDigitInClock; i++)
+			{
+				memcpy(clockProjected[i], projectedVertices[i], sizeof(int) * nVerticeInDigit * 2);
+				GET_SRTL_INSTANCE.notifyMonitor(GET_CURRENT_MODULE_INDEX, GET_PARAMS_INSTANCE(int), eSetBits);
+			}
+			xSemaphoreGive(xMutex_ClockProj);
+		}
+		vTaskDelay(pdMS_TO_TICKS(25));
+	}
+}
 
 void IRAM_ATTR customDigitalController(void *controllerPtr)
 {
@@ -1587,20 +1587,20 @@ void monitorCube(void *monitorPtr)
 	display.setTextSize(0);
 
 	// local var
-	Monitor currentModule = *((Monitor *)monitorPtr);
-	currentModule.notificationValue = 0;
+	Monitor * currentModule = ((Monitor *)monitorPtr);
+	currentModule->notificationValue = 0;
 	int cubeProjectedVertices[8][2];
 
-	// const u_int8_t nDigitInClock = 6;
-	// const u_int8_t nVerticeInDigit = 6;
-	// int clockProjectedVertices[6][6][2];
+	const u_int8_t nDigitInClock = 6;
+	const u_int8_t nVerticeInDigit = 6;
+	int clockProjectedVertices[6][6][2];
 
 	Serial.println("Monitor Begin");
 
 	for (;;)
 	{
 		// from any task
-		if (xTaskNotifyWait(0xFFFFFFFF, 0xFFFFFFFF, &currentModule.notificationValue, portMAX_DELAY))
+		if (xTaskNotifyWait(0xFFFFFFFF, 0xFFFFFFFF, &currentModule->notificationValue, portMAX_DELAY))
 		{
 			// Draw the cube :
 			display.clearDisplay();
@@ -1768,17 +1768,17 @@ void setup()
 	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer4, "C4", MINIMAL_STACK_SIZE, 1, (1 << vardataIndex), 200, NULL));								 // Intérêt pour vardata
 
 	// // Enregistrer les modules producteurs
-	// srtl.registerModule(replicatorA, "ReplicatorA", MINIMAL_STACK_SIZE * 2, 1, (1 << varReplicatedIndex), 200, NULL);
-	// srtl.registerModule(replicatorB, "ReplicatorB", MINIMAL_STACK_SIZE * 2, 1, (1 << varReplicatedIndex), 200, NULL);
+	srtl.registerModule(replicatorA, "ReplicatorA", MINIMAL_STACK_SIZE * 2, 1, (1 << varReplicatedIndex), 200, NULL);
+	srtl.registerModule(replicatorB, "ReplicatorB", MINIMAL_STACK_SIZE * 2, 1, (1 << varReplicatedIndex), 200, NULL);
 
 	// TEST CUBE
 
-	cubeProjectSharedID = varCubeProjIndex;
-	otherBits |= INDEX_TO_BITSET(srtl.registerModule(cubeTask, "Cube_compute", MINIMAL_STACK_SIZE * 2, 3, 0x00, 50, &cubeProjectSharedID));
+	// cubeProjectSharedID = varCubeProjIndex;
+	// otherBits |= INDEX_TO_BITSET(srtl.registerModule(cubeTask, "Cube_compute", MINIMAL_STACK_SIZE * 2, 3, 0x00, 50, &cubeProjectSharedID));
 
 	// TEST CLOCK
 
-	// otherBits |= INDEX_TO_BITSET(srtl.registerModule(digitalClockTask, "Clock_compute", MINIMAL_STACK_SIZE * 2, 3, 0x00, 50, &varClockProjIndex));
+	otherBits |= INDEX_TO_BITSET(srtl.registerModule(digitalClockTask, "Clock_compute", MINIMAL_STACK_SIZE * 2, 3, 0x00, 50, &varClockProjIndex));
 
 	// MONITOR
 
