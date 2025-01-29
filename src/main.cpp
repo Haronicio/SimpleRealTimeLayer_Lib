@@ -1,4 +1,8 @@
-// #define LOG_LOCAL_LEVEL ESP_LOG_ERROR
+#define configCHECK_FOR_STACK_OVERFLOW 2
+
+#undef configUSE_MALLOC_FAILED_HOOK
+#define configUSE_MALLOC_FAILED_HOOK 1
+
 #include <Arduino.h>
 #include <srtl.h>
 
@@ -9,27 +13,25 @@
 
 #include <esp_log.h>
 
-
-
 /*
-Debug 
+Debug
 cd C:\Users\haron\.platformio\packages\toolchain-xtensa-esp32\bin
 .\xtensa-esp32-elf-addr2line -pfiaC -e "C:\Users\haron\Documents\PlatformIO\Projects\SimpleRealTimeLayer_Lib\.pio\build\esp32doit-devkit-v1\firmware.elf" backtrace
 */
 
-#define configCHECK_FOR_STACK_OVERFLOW 2
-#define configUSE_MALLOC_FAILED_HOOK 1
-
-void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName) {
-   	log_e("Stack overflow in task: %s\n", pcTaskName);
-    while (1);
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+{
+	log_e("Stack overflow in task: %s\n", pcTaskName);
+	while (1)
+		;
 }
 
-void vApplicationMallocFailedHook(void) {
-    log_e("Heap allocation failed!");
-    while (1);
+void vApplicationMallocFailedHook(void)
+{
+	log_e("Heap allocation failed!");
+	while (1)
+		;
 }
-
 
 // #define configTOTAL_HEAP_SIZE ((1024) * (128))
 
@@ -987,8 +989,8 @@ void producer4(void *modulePtr)
 
 		// Serial.printf("test %d\n",xMutex_var2->uxItemSize);
 
-		// if (GET_SRTL_INSTANCE.notifyAll(0b1000, 0b100, eSetValueWithoutOverwrite))
-		// 	Serial.println(F("Producer4"));
+		if (GET_SRTL_INSTANCE.notifyAll(0b1000, 0b100, eSetValueWithoutOverwrite))
+			// Serial.println(F("Producer4"));
 
 		vTaskDelay(pdMS_TO_TICKS(50)); // Delay for 1000ms
 	}
@@ -1054,8 +1056,8 @@ void consummer2(void *modulePtr)
 // wait 2 notification
 void consummer3(void *modulePtr)
 {
-	Module currentModule = *((Module *)modulePtr);
-	currentModule.notificationValue = 0;
+	Module * currentModule = ((Module *)modulePtr);
+	currentModule->notificationValue = 0;
 
 	float local_var1 = 0.0, local_var2 = 0.0;
 
@@ -1063,8 +1065,8 @@ void consummer3(void *modulePtr)
 	// Task implementation
 	for (;;)
 	{
-		if (xTaskNotifyWait(0xFFFFFFFF, 0x00, &currentModule.notificationValue, pdMS_TO_TICKS(250)) &&
-			((EXTRACT_SHARED_RESOURCE(currentModule.notificationValue) & 0x03) == 0x03))
+		if (xTaskNotifyWait(0xFFFFFFFF, 0x00, &currentModule->notificationValue, pdMS_TO_TICKS(250)) &&
+			((EXTRACT_SHARED_RESOURCE(currentModule->notificationValue) & 0x03) == 0x03))
 		{
 
 			xSemaphoreTake(xMutex_var1, portMAX_DELAY);
@@ -1084,18 +1086,18 @@ void consummer3(void *modulePtr)
 // read the first notification arrive
 void consummer31(void *modulePtr)
 {
-	Module currentModule = *((Module *)modulePtr);
-	currentModule.notificationValue = 0;
+	Module * currentModule = ((Module *)modulePtr);
+	currentModule->notificationValue = 0;
 	float local_var1 = 0.0, local_var2 = 0.0;
 
 	GET_SRTL_INSTANCE.join(0, GET_CURRENT_MODULE_INDEX);
 	// Task implementation
 	for (;;)
 	{
-		if (xTaskNotifyWait(0xFFFFFFFF, 0xFFFFFFFF, &currentModule.notificationValue, portMAX_DELAY))
+		if (xTaskNotifyWait(0xFFFFFFFF, 0xFFFFFFFF, &currentModule->notificationValue, portMAX_DELAY))
 		{
 			// Serial.printf(" src: 0x%08X \t\n", currentModule.notificationValue);
-			if ((EXTRACT_SHARED_RESOURCE(currentModule.notificationValue) & 0b1) == 0b1)
+			if ((EXTRACT_SHARED_RESOURCE(currentModule->notificationValue) & 0b1) == 0b1)
 			{
 				xSemaphoreTake(xMutex_var1, portMAX_DELAY);
 				local_var1 = *(float *)GET_SRTL_INSTANCE.sharedRessources[0];
@@ -1104,7 +1106,7 @@ void consummer31(void *modulePtr)
 				xSemaphoreGive(xMutex_var1);
 			}
 
-			if ((EXTRACT_SHARED_RESOURCE(currentModule.notificationValue) & 0b10) == 0b10)
+			if ((EXTRACT_SHARED_RESOURCE(currentModule->notificationValue) & 0b10) == 0b10)
 			{
 
 				xSemaphoreTake(xMutex_var2, portMAX_DELAY);
@@ -1114,7 +1116,7 @@ void consummer31(void *modulePtr)
 				xSemaphoreGive(xMutex_var2);
 			}
 
-			currentModule.notificationValue = 0;
+			currentModule->notificationValue = 0;
 		}
 		vTaskDelay(pdMS_TO_TICKS(200));
 	}
@@ -1328,6 +1330,7 @@ void cubeTask(void *modulePtr)
 	// xTaskNotifyWait(0, 0, &vardata.ivar, portMAX_DELAY);
 	Serial.println("Cube Begin");
 
+
 	GET_SRTL_INSTANCE.join(2, GET_CURRENT_MODULE_INDEX);
 	for (;;)
 	{
@@ -1403,12 +1406,12 @@ void monitorCube(void *monitorPtr)
 	if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
 	{
 		Serial.println(F("SSD1306 allocation failed"));
-		for (;;);
+		for (;;)
+			;
 	}
 
-
 	Serial.print("Stack size monitor: ");
-    Serial.println(uxTaskGetStackHighWaterMark(NULL));
+	Serial.println(uxTaskGetStackHighWaterMark(NULL));
 	display.clearDisplay();
 	vTaskDelay(pdMS_TO_TICKS(1000));
 	Serial.println("Monitor Begin");
@@ -1416,8 +1419,6 @@ void monitorCube(void *monitorPtr)
 	// portENTER_CRITICAL(&mux);
 	display.display();
 	// portEXIT_CRITICAL(&mux);
-
-
 
 	display.setTextColor(WHITE, BLACK);
 	display.setTextSize(0);
@@ -1462,6 +1463,109 @@ void monitorCube(void *monitorPtr)
 	}
 }
 
+// Test event
+
+void eventTest(void *modulePtr)
+{
+	// NON copie une structure dans la variable locale
+	// Module currentModule = *((Module *)modulePtr);
+	Module * currentModule = ((Module *)modulePtr);
+
+
+	const uint8_t nEvent = 7;
+	eventTimer eventList[nEvent]; // Tableau de test
+	uint8_t eventCount = 0;
+
+	uint32_t now = CURRENT_EPOCH;
+
+	// 0 Minuteur actif & périodique (exécutions régulières)
+	addEvent(eventList, &eventCount, nEvent, true, false, now + 10, 30);
+
+	// 1 Minuteur actif & non périodique (exécution unique)
+	addEvent(eventList, &eventCount, nEvent, true, false, now + 20, 0);
+
+	// 2 Minuteur en retard mais périodique (exécuté en rattrapage)
+	addEvent(eventList, &eventCount, nEvent, true, false, now - 60, 15);
+
+	// 3 Minuteur en retard mais non rectifié (ignore le retard)
+	addEvent(eventList, &eventCount, nEvent, true, false, now - 40, 0);
+
+	// 4 Minuteur en retard et rectifié (exécuté immédiatement)
+	addEvent(eventList, &eventCount, nEvent, true, true, now - 35, 20);
+
+	// 5 Minuteur futur (prêt à s’exécuter plus tard)
+	addEvent(eventList, &eventCount, nEvent, true, false, now + 50, 0);
+
+	// 6 Minuteur désactivé (ne doit pas être pris en compte)
+	addEvent(eventList, &eventCount, nEvent, true, false, now + 5, 0);
+
+	// Debug
+	Serial.println("Tableau d'événements créé:");
+	Serial.printf("Actual Time : %d\n", now);
+	for (uint8_t i = 0; i < eventCount; i++)
+	{
+		Serial.printf("ID: %d | Actif: %d | Périodique: %d | Rectifié: %d | Time: %d | Period: %d\n",
+					  GET_EVENT_TIMER_ID(eventList[i].flags),
+					  GET_EVENT_TIMER_ACTIVE(eventList[i].flags),
+					  GET_EVENT_TIMER_PERIOD(eventList[i].flags),
+					  GET_EVENT_TIMER_ISRECT(eventList[i].flags),
+					  eventList[i].time,
+					  eventList[i].period);
+	}
+
+	for (;;)
+	{
+		uint8_t eventID = GET_SRTL_INSTANCE.autoTimer(currentModule, eventList, nEvent);
+
+		switch (eventID)
+		{
+		case 0:
+			Serial.println("    0 Minuteur standard périodique.");
+			break;
+		case 1:
+			Serial.println("    1 Minuteur non périodique exécuté une seule fois.");
+			break;
+		case 2:
+			Serial.println("    2 Minuteur en retard avec compensation.");
+			break;
+		case 3:
+			Serial.println("    3 Minuteur en retard mais non rectifié.");
+			break;
+		case 4:
+			Serial.println("    4 Minuteur rectifié et exécuté immédiatement.");
+			break;
+		case 5:
+			Serial.println("    5 Minuteur futur planifié.");
+			break;
+		case 6:
+			Serial.println("    6 Minuteur désactivé (ne devrait pas être exécuté).");
+			break;
+		default:
+			Serial.println("    ! Evénement Erreur.");
+			break;
+		}
+
+		vTaskDelay(pdMS_TO_TICKS(currentModule->taskFrequency));
+	}
+}
+
+// TEST
+struct Digit{
+
+};
+
+struct DigitalClock
+{
+	struct Digit digits[6];
+} digitalClock;
+
+SemaphoreHandle_t xMutex_digitalClockVar;
+protected_data_t protected_clock = {&xMutex_digitalClockVar, (void *)&digitalClock};
+
+int clockProjected[6][6][2];
+SemaphoreHandle_t xMutex_ClockProj;
+protected_data_t protected_clock_projection = {&xMutex_ClockProj, (void *)&clockProjected};
+
 // main loop :
 
 // init
@@ -1474,17 +1578,17 @@ void setup()
 	Serial.begin(115200);
 	Serial.println(F("In Setup function"));
 
-
-	esp_log_level_set("*", ESP_LOG_ERROR);  // Activer tous les logs
+	esp_log_level_set("*", ESP_LOG_ERROR); // Activer tous les logs
 	esp_log_level_set("*", ESP_LOG_WARN);  // Activer tous les logs
 	// esp_log_level_set("I2C", ESP_LOG_ERROR);  // Log uniquement les erreurs pour I2C
 
 	log_e("test");
 
-	if (!syncWifiInit("Freebox-022439", "SebastienSexy7")) {
-        Serial.println("Failed to connect to WiFi.");
-        return;
-    }
+	if (!syncWifiInit("Freebox-022439", "SebastienSexy7"))
+	{
+		Serial.println("Failed to connect to WiFi.");
+		return;
+	}
 	Serial.print(SYNC_SYSTIME_CONFIG);
 
 	// Enregistrement des ressources partagées
@@ -1497,10 +1601,12 @@ void setup()
 	uint8_t varCubeIndex = srtl.registerSharedResource(protected_cube);
 	uint8_t varCubeProjIndex = srtl.registerSharedResource(protected_cube_projection);
 
+	uint8_t varClockIndex = srtl.registerSharedResource(protected_clock);
+	uint8_t varClockProjIndex = srtl.registerSharedResource(protected_clock_projection);
+
 	uint32_t consumerBits = 0;
 	uint32_t producerBits = 0;
 	uint32_t otherBits = 0;
-
 
 	otherBits |= INDEX_TO_BITSET(srtl.registerModule(test, "test", MINIMAL_STACK_SIZE, 5, 0x00, 200, NULL));
 
@@ -1510,10 +1616,10 @@ void setup()
 	producerBits |= INDEX_TO_BITSET(srtl.registerModule(producer3, "P3", MINIMAL_STACK_SIZE * 2, 1, 0x00, 200, NULL));
 	producerBits |= INDEX_TO_BITSET(srtl.registerModule(producer4, "P4", MINIMAL_STACK_SIZE * 2, 1, 0x00, 200, NULL));
 
-	// // // Enregistrement des modules consommateurs
+	// Enregistrement des modules consommateurs
 	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer1, "C1", MINIMAL_STACK_SIZE, 1, (1 << var1Index), 200, NULL));									 // Intérêt pour var1
 	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer2, "C2", MINIMAL_STACK_SIZE, 1, (1 << var2Index), 200, NULL));									 // Intérêt pour var2
-	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer3, "C3", MINIMAL_STACK_SIZE * 2, 1, (1 << var1Index) | (1 << var2Index), 200, NULL));				 // Intérêt pour var1 et var2
+	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer3, "C3", MINIMAL_STACK_SIZE * 2, 1, (1 << var1Index) | (1 << var2Index), 200, NULL));			 // Intérêt pour var1 et var2
 	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer31, "consummer31", MINIMAL_STACK_SIZE * 3, 2, (1 << var1Index) | (1 << var2Index), 200, NULL)); // Intérêt pour var1 et var2
 	consumerBits |= INDEX_TO_BITSET(srtl.registerModule(consummer4, "C4", MINIMAL_STACK_SIZE, 1, (1 << vardataIndex), 200, NULL));								 // Intérêt pour vardata
 
@@ -1528,7 +1634,7 @@ void setup()
 
 	// MONITOR
 
-	srtl.registerMonitor(monitorCube, "OLED_Sreen", MINIMAL_STACK_SIZE * 7,  (configMAX_PRIORITIES - 1), 50, NULL);
+	srtl.registerMonitor(monitorCube, "OLED_Sreen", MINIMAL_STACK_SIZE * 3, (configMAX_PRIORITIES - 1), 50, NULL);
 	if (srtl.sysMonitor.handle != NULL)
 	{
 		Serial.printf("Monitor Handle: %p Interest: 0x%X\n", srtl.sysMonitor.handle, srtl.sysMonitor.ressourceOfInterest);
@@ -1544,6 +1650,8 @@ void setup()
 	// PinControllerParam customController_param[MAX_DIGITALPIN_IN_CONTROLLER] = {{15, INPUT_PULLDOWN, CHANGE}, {27, INPUT_PULLDOWN, CHANGE}, {0, 0, 0}};
 	// srtl.registerController(customDigitalController, customController_param, NULL, NULL, 0, NULL);
 
+	// TEST EVENT
+	srtl.registerModule(eventTest, "Event", MINIMAL_STACK_SIZE * 2, 5, 0, 500, NULL);
 
 	// JOIN
 
@@ -1561,13 +1669,12 @@ void setup()
 	{
 		Serial.printf("wait 0 : %s, wait 1 :%s\n", TO_BIN(released), TO_BIN(srtl.joinList[1]));
 	} // ALL producer are ready and consummer are waiting
-	// released = srtl.unjoin(1, 4);
+	released = srtl.unjoin(1, 4);
 	Serial.printf("Producer  %d leave barrier 1\n", released);
 
-
 	delay(1000);
-	Serial.print("Stack size setup: ");
-    Serial.println(uxTaskGetStackHighWaterMark(NULL));
+	Serial.print("Stack size setup(): ");
+	Serial.println(uxTaskGetStackHighWaterMark(NULL));
 
 	released = srtl.release(1);
 	Serial.printf("Producer Released %s\n", TO_BIN(released));

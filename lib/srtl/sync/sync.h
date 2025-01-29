@@ -111,19 +111,22 @@ static int32_t syncTimer(uint32_t targetTime)
 
 // Event Timer system
 
-#define NBITS_EVENTTIMER_ID 5
-#define MAX_EVENTTIMER_IN_MODULE (1 << NBITS_EVENTTIMER_ID)
+#define NBITS_EVENTTIMER_ID 4
+#define MAX_EVENT_TIMER_IN_MODULE (1 << NBITS_EVENTTIMER_ID)
 #define BIT_EVENT_TIMER_ACTIVE 0
 #define BIT_EVENT_TIMER_PERIOD 1
-#define BIT_EVENT_TIMER_ISNEXT 2
+#define BIT_EVENT_TIMER_ISRECT 2
+#define BIT_EVENT_TIMER_ISNEXT 3
 
 #define GET_EVENT_TIMER_ACTIVE(eventFlags) (eventFlags & 1) 
 #define GET_EVENT_TIMER_PERIOD(eventFlags) ((eventFlags >> BIT_EVENT_TIMER_PERIOD) & 1) 
+#define GET_EVENT_TIMER_ISRECT(eventFlags) ((eventFlags >> BIT_EVENT_TIMER_ISRECT) & 1)
 #define GET_EVENT_TIMER_ISNEXT(eventFlags) ((eventFlags >> BIT_EVENT_TIMER_ISNEXT) & 1)
-#define GET_EVENT_TIMER_ID(eventFlags) (((eventFlags >> (8 - NBITS_EVENTTIMER_ID)) & (MAX_EVENTTIMER_IN_MODULE - 1)))
+#define GET_EVENT_TIMER_ID(eventFlags) (((eventFlags >> (8 - NBITS_EVENTTIMER_ID)) & (MAX_EVENT_TIMER_IN_MODULE - 1)))
 
 #define SET_EVENT_TIMER_ACTIVE(eventFlags, value) (eventFlags = (eventFlags & ~(1 << BIT_EVENT_TIMER_ACTIVE)) | ((value & 1) << BIT_EVENT_TIMER_ACTIVE))
 #define SET_EVENT_TIMER_PERIOD(eventFlags, value) (eventFlags = (eventFlags & ~(1 << BIT_EVENT_TIMER_PERIOD)) | ((value & 1) << BIT_EVENT_TIMER_PERIOD))
+#define SET_EVENT_TIMER_ISRECT(eventFlags, value) (eventFlags = (eventFlags & ~(1 << BIT_EVENT_TIMER_ISRECT)) | ((value & 1) << BIT_EVENT_TIMER_ISRECT))
 #define SET_EVENT_TIMER_ISNEXT(eventFlags, value) (eventFlags = (eventFlags & ~(1 << BIT_EVENT_TIMER_ISNEXT)) | ((value & 1) << BIT_EVENT_TIMER_ISNEXT))
 #define SET_EVENT_TIMER_ID(eventFlags, value)     (eventFlags = (eventFlags & ~(((1 << NBITS_EVENTTIMER_ID) - 1) << (8 - NBITS_EVENTTIMER_ID))) \
                                                               | ((value & ((1 << NBITS_EVENTTIMER_ID) - 1)) << (8 - NBITS_EVENTTIMER_ID)))
@@ -137,47 +140,68 @@ static int32_t syncTimer(uint32_t targetTime)
     
     WARNING eventTimer are heavy memory load
 */
-typedef struct eventTimer
+typedef struct 
 {
-    uint8_t flags; // bits : 0 isactiv, 1 isperiodic, 2 isnext , 3-7 id 
+    uint8_t flags; // bits : 0 isactiv, 1 isperiodic, 2 isrectified, 3 isnext , 4-7 id 
     uint32_t eventCount; // occurence du Timer
     uint32_t time; // in s
-    uint32_t period;
+    uint32_t period; // in s
     uint32_t lastExecution; // in s
-};
+}eventTimer;
 
 
 // TODO gestion eventTimer
 
-inline uint32_t getMissedEventCounts(eventTimer *timer)
+/*
+    compute Missed count
+*/
+inline uint32_t getMissedEventCounts(eventTimer *event)
 {
-    if (timer->period == 0)
+    if (event->period == 0)
     {
         return 0;
     }
 
-    // uint32_t now = CURRENT_EPOCH;
+    return (CURRENT_EPOCH - event->time) / event->period;
+}
 
-    // if (now > (timer->lastExecution + timer->period)) //event late ?
-    // {
-    //     // how many period
-    //     uint32_t expectedCount = (now - timer->time) / timer->period;
+inline eventTimer createEventTimer(bool isactive,bool isperiodic,bool isrectified,uint32_t time, uint32_t period){
+    uint8_t flags = 0;
+    SET_EVENT_TIMER_ACTIVE(flags,isactive);
+    SET_EVENT_TIMER_PERIOD(flags,isperiodic);
+    SET_EVENT_TIMER_ISRECT(flags,isrectified);
+    eventTimer ret = {flags,0,time,period,0};
 
-    //     // Calcul du nombre d'exécutions réellement manquées
-    //     uint32_t missedCount = expectedCount - timer->eventCount;
+    return ret;
+}
 
-    //     // Mettre à jour eventCount pour qu'il corresponde au temps réel
-    //     // timer->eventCount = expectedCount;
+void addEvent(eventTimer *eventList, uint8_t *eventCount, uint8_t maxSize,
+              bool isActive, bool isRectified, uint32_t time, uint32_t period)
+{
 
-    //     // // Mettre à jour lastExecution pour éviter un double comptage
-    //     // timer->lastExecution = timer->time + timer->eventCount * timer->period;
+    if(eventList == nullptr){
+        Serial.println("Erreur: Tableau d'événements n'est pas initialiser.");
+        return;
+    }
 
-    //     return missedCount;
-    // }
+    if(maxSize >= MAX_EVENT_TIMER_IN_MODULE ){
+        Serial.println("Erreur: Tableau d'événements dépasse la taille autorisé.");
+        return;
+    }
 
-    // return 0; // Aucune exécution manquée
+    if (*eventCount >= maxSize)
+    {
+        Serial.println("Erreur: Tableau d'événements plein.");
+        return;
+    }
 
-    return (CURRENT_EPOCH - timer->time) / timer->period;
+    eventTimer newEvent = createEventTimer(isActive, (period > 0), isRectified, time, period);
+    SET_EVENT_TIMER_ID(newEvent.flags, *eventCount);
+
+    eventList[*eventCount] = newEvent;
+    (*eventCount)++;
+
+    Serial.printf("Événement ajouté avec ID %d, time: %d, period: %d\n",GET_EVENT_TIMER_ID(newEvent.flags), time, period);
 }
 
 #endif // SYNC_H
