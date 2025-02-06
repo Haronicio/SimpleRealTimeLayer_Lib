@@ -131,13 +131,13 @@ public: // TODO getter and setter
     }
 
     // Notifications
-    uint8_t notifyModule(uint16_t destModuleIndex, uint16_t srcModuleIndex, uint32_t sharedRessourceBits, eNotifyAction action)
+    uint8_t notifyModule(uint16_t destModuleIndex, uint16_t srcModuleBits, uint32_t sharedRessourceBits, eNotifyAction action)
     {
         if (this->moduleList[destModuleIndex].handle == NULL)
         {
-            Serial.printf("WARNING %d NULL ( from %d)", destModuleIndex, srcModuleIndex);
+            Serial.printf("WARNING %d NULL ( from %d)", destModuleIndex, srcModuleBits);
         }
-        return xTaskNotify(this->moduleList[destModuleIndex].handle, NOTIFY_MSG(sharedRessourceBits, srcModuleIndex), action);
+        return xTaskNotify(this->moduleList[destModuleIndex].handle, NOTIFY_MSG(sharedRessourceBits, srcModuleBits), action);
     }
 
     uint8_t notifyAll(uint16_t srcModuleIndex, uint32_t sharedRessourceBits, eNotifyAction action)
@@ -274,10 +274,13 @@ public: // TODO getter and setter
         Module expose the situation to other ("I'm sleeping on this timer") and hold tick delay information
         But EventTimer should not be shared (even with a proper protected_data_t) because syncTimer will created starvation or deadlock
 
+        compute delta for all events
         If events are late and periodic, catch up last late period 
         If events are on time or early, search for the closest delta or latest delta  
-        If events are not to rectified ignore delta 
-        If events are periodic report next timer
+        Else if events are not to rectified, ignore delta 
+
+        If next event are periodic, report to next timer
+        after sleeping, if events are not periodic dactivate event -> in user mae ?
 
         return the event id if events in success or UINT8_MAX in case of fail
 
@@ -319,10 +322,10 @@ public: // TODO getter and setter
                 SET_EVENT_TIMER_ISNEXT(events[i].flags, 0);
                 int32_t delta = syncTimer(events[i].time); //( > 0) futur ( < 0) past
 
-                if (delta < 0 && GET_EVENT_TIMER_PERIOD(events[i].flags == 1)) // task is late and periodic
+                if ((delta < 0 ) && (GET_EVENT_TIMER_PERIOD(events[i].flags) == 1)) // task is late and periodic
                 {
                     /*
-                        doit q'éxécuté toutes les 15 secondes, il ne s'est pas éxécuté pendant 48 seconde (donc -48 )
+                        doit l'éxécuté toutes les 15 secondes, il ne s'est pas éxécuté pendant 48 seconde (donc -48 )
                         cela a équivaut à 48/15 ~ 3 fois manqué, donc la 4ème éxécution sera à l'heure, et la 3ème doit s'éxécuter maintenant
                         s'il avait fait ces 3 fois manqué il aurait un peu de retard (3secondes), c'est celui ci qui est éxécuté immédiatement
                         s'il est a rectifié
@@ -330,15 +333,24 @@ public: // TODO getter and setter
 
                     uint32_t missedCount = getMissedEventCounts(&events[i]);
 
-                    events[i].time += events[i].period * missedCount;
-                    events[i].eventCount += missedCount;
-                    events[i].lastExecution = events[i].time;
+                    events[i].time += events[i].period * (missedCount); 
+                    events[i].missedCount += missedCount;
+                    events[i].lastTimer = events[i].time;
 
                     delta = syncTimer(events[i].time); //( > 0) futur ( < 0) past
+
+                    Serial.printf("|\tdelat < 0 + Periodic | event %d | delta %d | missed count %d   \n", 
+                    i, 
+                    delta,
+                    events[i].missedCount);
                 }
 
-                if (delta >= 0 || GET_EVENT_TIMER_ISRECT(events[i].flags) == 1) // task is early (or ontime) or need to be rectified -> Ignore delta
+                if ((delta >= 0) || (GET_EVENT_TIMER_ISRECT(events[i].flags) == 1)) // task is early (or ontime) or need to be rectified -> Ignore delta
                 {
+                    Serial.printf("|\tNext selection | event %d | delta %d   \n", 
+                    i, 
+                    delta);
+
                     int32_t tmp = min(minDelta, delta);
                     if (tmp != minDelta)
                     {
@@ -346,16 +358,21 @@ public: // TODO getter and setter
                         lastTime = events[i].time;
                         nextEvent = &events[i];
                     }
-                }
 
-                // periodicity
-                if (GET_EVENT_TIMER_PERIOD(events[i].flags))
-                {
-                    events[i].time += events[i].period;
                 }
             }
         }
         xSemaphoreGive(xMutex_SyncTimer);
+
+        // periodicity
+        if (GET_EVENT_TIMER_PERIOD(nextEvent->flags))
+        {
+            nextEvent->time += nextEvent->period;
+
+            Serial.printf("|\tReported | event %d | date %d   \n", 
+            GET_EVENT_TIMER_ID(nextEvent->flags), 
+            nextEvent->time);
+        }
 
         // TODO WARNING PROTECT THAT NOTE list head or nextactive ?
         // modulePtr->lastEvents = events;
@@ -371,22 +388,35 @@ public: // TODO getter and setter
 
         if (minDelta > 1) // task is early
         {
-            Serial.printf("Module %d sleep for %d , ET %d\n", ARRAY_INDEX_FROM_PTR(this->moduleList, modulePtr), minDelta, GET_EVENT_TIMER_ID(nextEvent->flags));
+            Serial.printf("Module %d | event %d | sleep for %d ( %d )  \n", 
+            ARRAY_INDEX_FROM_PTR(this->moduleList, modulePtr),
+            GET_EVENT_TIMER_ID(nextEvent->flags), 
+            minDelta,
+            CURRENT_EPOCH + minDelta);
 
             // Sleep to reach next date (heavy time load measured ~ 1 sec)
             vTaskDelayUntil(&modulePtr->lastAwake, pdMS_TO_TICKS((minDelta + 1) *1000 - modulePtr->taskFrequency));
         }
         else // task is late or ontime
-            Serial.printf("Module %d execute immediatly  %d , ET %d\n", ARRAY_INDEX_FROM_PTR(this->moduleList, modulePtr), minDelta, GET_EVENT_TIMER_ID(nextEvent->flags));
-
+            Serial.printf("Module %d | event %d | execute immediatly for %d ( %d )  \n", 
+            ARRAY_INDEX_FROM_PTR(this->moduleList, modulePtr),
+            GET_EVENT_TIMER_ID(nextEvent->flags), 
+            minDelta,
+            CURRENT_EPOCH + minDelta);
         // lastExecution and count
-        nextEvent->lastExecution = lastTime;
+        nextEvent->lastTimer = lastTime;
         nextEvent->eventCount++;
+
+        // shutdown terminate event (after sleeping, if not periodic dactivate event -> in user mae ?)
+        if (!GET_EVENT_TIMER_PERIOD(nextEvent->flags))
+        {
+            SET_EVENT_TIMER_ACTIVE(nextEvent->flags,0);
+        }
 
         return GET_EVENT_TIMER_ID(nextEvent->flags);
         /*
             TODO get relationship ... maybe impossible due to late execution
-             modulePtr->lastEvents->lastExecution ~~ CURRENT_EPOCH + MILLIS_TO_EPOCH((pdTICKS_TO_MILLIS(modulePtr->lastAwake))) (without preemption)
+             modulePtr->lastEvents->lastTimer ~~ CURRENT_EPOCH + MILLIS_TO_EPOCH((pdTICKS_TO_MILLIS(modulePtr->lastAwake))) (without preemption)
         */
     }
 

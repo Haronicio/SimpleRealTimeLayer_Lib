@@ -80,9 +80,9 @@ struct SRTL;
 #define ARRAY_INDEX_FROM_PTR(array, element_ptr) ((element_ptr) - (&array[0]))
 
 char binaryBuffer[33];
-#define TO_BIN(value) (itoa(value, binaryBuffer, 2))
+#define TO_BIN(value) (itoa((value), binaryBuffer, 2))
 
-#define INDEX_TO_BITSET(index) ((1 << index))
+#define INDEX_TO_BITSET(index) ((1 << (index)))
 
 // MACRO INSIDE MODULE HANDLER
 

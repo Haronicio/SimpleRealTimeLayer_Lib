@@ -138,15 +138,16 @@ static int32_t syncTimer(uint32_t targetTime)
     Utile lorsqu'on veut qu'une tâche passe beaucoup de temps à dormir, et informer sa MAE
     (Les autres tâches peuvent accéder de manière non protégé, il est pas possible d'utiliser un mutex sur un eventTimer géré par autoTimer) 
     
-    WARNING eventTimer are heavy memory load
+    WARNING eventTimer are heavy memory load 21 octets !!!
 */
 typedef struct 
 {
     uint8_t flags; // bits : 0 isactiv, 1 isperiodic, 2 isrectified, 3 isnext , 4-7 id 
-    uint32_t eventCount; // occurence du Timer
+    uint32_t eventCount; // occurence de l'évenements effectué
+    uint32_t missedCount; // occurence de l'évenements manqué
     uint32_t time; // in s
     uint32_t period; // in s
-    uint32_t lastExecution; // in s
+    uint32_t lastTimer; // in s
 }eventTimer;
 
 
@@ -170,12 +171,13 @@ inline eventTimer createEventTimer(bool isactive,bool isperiodic,bool isrectifie
     SET_EVENT_TIMER_ACTIVE(flags,isactive);
     SET_EVENT_TIMER_PERIOD(flags,isperiodic);
     SET_EVENT_TIMER_ISRECT(flags,isrectified);
-    eventTimer ret = {flags,0,time,period,0};
+    // flags, eventCount, missedCount,time,period,lastTimer
+    eventTimer ret = {flags,0,0,time,period,0};
 
     return ret;
 }
 
-void addEvent(eventTimer *eventList, uint8_t *eventCount, uint8_t maxSize,
+void addEvent(eventTimer *eventList, uint8_t *nEvent,
               bool isActive, bool isRectified, uint32_t time, uint32_t period)
 {
 
@@ -184,22 +186,17 @@ void addEvent(eventTimer *eventList, uint8_t *eventCount, uint8_t maxSize,
         return;
     }
 
-    if(maxSize >= MAX_EVENT_TIMER_IN_MODULE ){
-        Serial.println("Erreur: Tableau d'événements dépasse la taille autorisé.");
-        return;
-    }
-
-    if (*eventCount >= maxSize)
+    if (*nEvent >= MAX_EVENT_TIMER_IN_MODULE)
     {
         Serial.println("Erreur: Tableau d'événements plein.");
         return;
     }
 
     eventTimer newEvent = createEventTimer(isActive, (period > 0), isRectified, time, period);
-    SET_EVENT_TIMER_ID(newEvent.flags, *eventCount);
+    SET_EVENT_TIMER_ID(newEvent.flags, *nEvent);
 
-    eventList[*eventCount] = newEvent;
-    (*eventCount)++;
+    eventList[*nEvent] = newEvent;
+    (*nEvent)++;
 
     Serial.printf("Événement ajouté avec ID %d, time: %d, period: %d\n",GET_EVENT_TIMER_ID(newEvent.flags), time, period);
 }

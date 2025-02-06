@@ -1357,6 +1357,8 @@ void cubeTask(void *modulePtr)
 		if (xSemaphoreTake(xMutex_CubeProj, portMAX_DELAY) == pdTRUE)
 		{
 			memcpy(cubeProjected.projectedVertcices, projectedVertices, sizeof(int) * 8 * 2);
+			// Utilisation bancale de notify, mettre directement l'index n'est pas génant mais peut override les bits des autres modules qui notifie
+			// params contient l'id de la ressource partagé
 			GET_SRTL_INSTANCE.notifyMonitor(GET_CURRENT_MODULE_INDEX, GET_PARAMS_INSTANCE(int), eSetBits);
 			xSemaphoreGive(xMutex_CubeProj);
 		}
@@ -1424,8 +1426,8 @@ void monitorCube(void *monitorPtr)
 	display.setTextSize(0);
 
 	// local var
-	Monitor currentModule = *((Monitor *)monitorPtr);
-	currentModule.notificationValue = 0;
+	Monitor * currentModule = ((Monitor *)monitorPtr);
+	currentModule->notificationValue = 0;
 	int cubeProjectedVertices[8][2];
 
 	Serial.println("Monitor Begin");
@@ -1433,7 +1435,7 @@ void monitorCube(void *monitorPtr)
 	for (;;)
 	{
 		// from any task
-		if (xTaskNotifyWait(0xFFFFFFFF, 0xFFFFFFFF, &currentModule.notificationValue, portMAX_DELAY))
+		if (xTaskNotifyWait(0xFFFFFFFF, 0xFFFFFFFF, &currentModule->notificationValue, portMAX_DELAY))
 		{
 			// Draw the cube :
 			display.clearDisplay();
@@ -1467,37 +1469,58 @@ void monitorCube(void *monitorPtr)
 
 void eventTest(void *modulePtr)
 {
-	// NON copie une structure dans la variable locale
-	// Module currentModule = *((Module *)modulePtr);
+	// ERROR  NON copie une structure dans la variable locale  : Module currentModule = *((Module *)modulePtr);
+	// 				
 	Module * currentModule = ((Module *)modulePtr);
 
 
-	const uint8_t nEvent = 7;
-	eventTimer eventList[nEvent]; // Tableau de test
+	eventTimer eventList[MAX_EVENT_TIMER_IN_MODULE]; // Tableau de test
 	uint8_t eventCount = 0;
+
+	vTaskDelay(pdMS_TO_TICKS(2000));
 
 	uint32_t now = CURRENT_EPOCH;
 
-	// 0 Minuteur actif & périodique (exécutions régulières)
-	addEvent(eventList, &eventCount, nEvent, true, false, now + 10, 30);
+	// TODO  essayéavec commutation intra-tâche notify inter-tâche 
+	// compter les missed pour que l'utilisateur gère les famines
 
-	// 1 Minuteur actif & non périodique (exécution unique)
-	addEvent(eventList, &eventCount, nEvent, true, false, now + 20, 0);
+	// 0 Minuteur il s'éxécute forcment au bout de 1000 secondes
+	addEvent(eventList, &eventCount, true, true, now + 1000, 0);
 
-	// 2 Minuteur en retard mais périodique (exécuté en rattrapage)
-	addEvent(eventList, &eventCount, nEvent, true, false, now - 60, 15);
+	// 1 Minuteur dans 500 secondes il s'éxécutera toutes les 1000 secondes pour sur
+	addEvent(eventList, &eventCount, true, true, now + 500, 1000);
 
-	// 3 Minuteur en retard mais non rectifié (ignore le retard)
-	addEvent(eventList, &eventCount, nEvent, true, false, now - 40, 0);
+	// 2 Minuteur  il s'éxécute en retard
+	addEvent(eventList, &eventCount,  true, true, now - 100, 0);
 
-	// 4 Minuteur en retard et rectifié (exécuté immédiatement)
-	addEvent(eventList, &eventCount, nEvent, true, true, now - 35, 20);
+	// 3 Minuteur Très en retard, il rattrape toutes ses éxécutions puis toutes les 1000 secondes pour sur
+	addEvent(eventList, &eventCount,  true, true, now - 20010, 1000);
 
-	// 5 Minuteur futur (prêt à s’exécuter plus tard)
-	addEvent(eventList, &eventCount, nEvent, true, false, now + 50, 0);
+	// 4 Minuteur s'éxécute dans 500 secondes sauf en cas de retard
+	addEvent(eventList, &eventCount,  true, false, now + 500, 0);
 
-	// 6 Minuteur désactivé (ne doit pas être pris en compte)
-	addEvent(eventList, &eventCount, nEvent, true, false, now + 5, 0);
+	// 5 Minuteur s'éxécute dans 1000 secondes toutes les 1000 secondes sauf en cas de retard
+	// la mae lui permet d'être éxécuté de force tous les 5 évènement ratés
+	addEvent(eventList, &eventCount,  true, false, now + 1000, 1000);
+
+	// 6 Minuteur à beaucoup de retard et ne s'éxécutera jamais
+	addEvent(eventList, &eventCount,  true, false, now - 20010 , 0);
+
+	// 7 Minuteur à beaucoup de retard et se reporte à 1000 secondes sauf en cas de retard
+	// la mae lui permet d'être éxécuté de force tous les 200 secondes de retard accumulé
+	addEvent(eventList, &eventCount,  true, false, now - 20010 , 1000);
+
+	// 8 Minuteur désactivé (ne doit pas être pris en compte)
+	addEvent(eventList, &eventCount,  false, false, now , 0);
+
+	// 9 Minuteur flood sans correction
+	addEvent(eventList, &eventCount,  true, false, now + 50, 10);
+
+	// 10 Minuteur flood 
+	addEvent(eventList, &eventCount,  true, true, now + 50, 10);
+
+	// 11 Minuteur de fin
+	addEvent(eventList, &eventCount,  true, true, now + 10000, 0);
 
 	// Debug
 	Serial.println("Tableau d'événements créé:");
@@ -1515,38 +1538,92 @@ void eventTest(void *modulePtr)
 
 	for (;;)
 	{
-		uint8_t eventID = GET_SRTL_INSTANCE.autoTimer(currentModule, eventList, nEvent);
+		uint8_t eventID = GET_SRTL_INSTANCE.autoTimer(currentModule, eventList, eventCount);
 
-		switch (eventID)
-		{
-		case 0:
-			Serial.println("    0 Minuteur standard périodique.");
+		if(eventID < eventCount){
+			Serial.printf("Epoch: %d | ID: %d | Actif: %d | Périodique: %d | Rectifié: %d | Time: %d | Period: %d | Count: %d | Miss: %d | Last: %d\n",
+					  CURRENT_EPOCH,
+					  eventID,
+					  GET_EVENT_TIMER_ACTIVE(eventList[eventID].flags),
+					  GET_EVENT_TIMER_PERIOD(eventList[eventID].flags),
+					  GET_EVENT_TIMER_ISRECT(eventList[eventID].flags),
+					  eventList[eventID].time,
+					  eventList[eventID].period,
+					  eventList[eventID].eventCount,
+					  eventList[eventID].missedCount,
+					  eventList[eventID].lastTimer
+					  );
+
+
+		// if(CURRENT_EPOCH > SYNC_SYSTIME_CONFIG + 10000)// ~3h
+		if(eventID == 11)// ~3h
 			break;
-		case 1:
-			Serial.println("    1 Minuteur non périodique exécuté une seule fois.");
-			break;
-		case 2:
-			Serial.println("    2 Minuteur en retard avec compensation.");
-			break;
-		case 3:
-			Serial.println("    3 Minuteur en retard mais non rectifié.");
-			break;
-		case 4:
-			Serial.println("    4 Minuteur rectifié et exécuté immédiatement.");
-			break;
-		case 5:
-			Serial.println("    5 Minuteur futur planifié.");
-			break;
-		case 6:
-			Serial.println("    6 Minuteur désactivé (ne devrait pas être exécuté).");
-			break;
-		default:
-			Serial.println("    ! Evénement Erreur.");
-			break;
+
+
+		if(eventID == 5)
+			SET_EVENT_TIMER_ISRECT(eventList[eventID].flags,0);
+
+		if(eventID == 7)
+			SET_EVENT_TIMER_ISRECT(eventList[eventID].flags,0);
+
+
+		if(eventID == 10)
+			GET_SRTL_INSTANCE.notifyModule(GET_CURRENT_MODULE_INDEX + 1,INDEX_TO_BITSET(GET_CURRENT_MODULE_INDEX),0,eSetBits);
+
+		
+		}
+		else
+			Serial.println("Error in EventList");
+
+		if(eventList[5].missedCount > 5){
+			SET_EVENT_TIMER_ISRECT(eventList[5].flags,1);
+			eventList[5].missedCount = 0;
+		}
+
+		if(syncTimer(eventList[7].time) < -200){
+			SET_EVENT_TIMER_ISRECT(eventList[7].flags,1);
 		}
 
 		vTaskDelay(pdMS_TO_TICKS(currentModule->taskFrequency));
+
 	}
+
+
+	Serial.printf("\n\nend\n\n");
+
+	for (uint8_t i = 0; i < eventCount; i++)
+	{
+		if(i < eventCount)
+			Serial.printf("Epoch: %d | ID: %d | Actif: %d | Périodique: %d | Rectifié: %d | Time: %d | Period: %d | Count: %d | Last: %d\n",
+					  CURRENT_EPOCH,
+					  i,
+					  GET_EVENT_TIMER_ACTIVE(eventList[i].flags),
+					  GET_EVENT_TIMER_PERIOD(eventList[i].flags),
+					  GET_EVENT_TIMER_ISRECT(eventList[i].flags),
+					  eventList[i].time,
+					  eventList[i].period,
+					  eventList[i].eventCount,
+					  eventList[i].lastTimer);
+	}
+
+	vTaskDelete(NULL);
+}
+
+void eventTestReceiver(void *modulePtr){
+	Module * currentModule = ((Module *)modulePtr);
+	currentModule->notificationValue = 0;
+
+	for(;;){
+
+		if (xTaskNotifyWait(0xFFFFFFFF, 0xFFFFFFFF, &currentModule->notificationValue, portMAX_DELAY)){
+			if(EXTRACT_SOURCE_MODULE(currentModule->notificationValue) == INDEX_TO_BITSET((GET_CURRENT_MODULE_INDEX - 1))){
+				Serial.printf("\n Event Receive !!!!!!!!!!!!!! \n");
+			}
+		}
+
+	}
+
+	vTaskDelay(pdMS_TO_TICKS(currentModule->taskFrequency));
 }
 
 // TEST
@@ -1651,7 +1728,8 @@ void setup()
 	// srtl.registerController(customDigitalController, customController_param, NULL, NULL, 0, NULL);
 
 	// TEST EVENT
-	srtl.registerModule(eventTest, "Event", MINIMAL_STACK_SIZE * 2, 5, 0, 500, NULL);
+	srtl.registerModule(eventTest, "Event", MINIMAL_STACK_SIZE * 2, 5, 0, 1, NULL);
+	srtl.registerModule(eventTestReceiver, "Event Receiver",MINIMAL_STACK_SIZE * 2, 5, 0, 1, NULL);
 
 	// JOIN
 
@@ -1736,9 +1814,9 @@ void setup()
 
 void loop()
 {
-
+	Serial.print("EPOCH : ");
 	Serial.println(-syncTimer(0));
-	vTaskDelay(pdMS_TO_TICKS(1000));
+	vTaskDelay(pdMS_TO_TICKS(100 * 1000 )); //every 100 seconde
 }
 
 #endif
