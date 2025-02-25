@@ -3,6 +3,7 @@
 
 #include "../core/core.h"
 #include <WiFi.h>
+#include <SD.h>
 #include "time.h"
 
 /*
@@ -16,6 +17,11 @@
 #else
 #define SYNC_SYSTIME_CONFIG 1738079979UL
 #endif
+
+// integer -12 -> +12
+#define GMT_LOCAL 1
+// 0-1 (De)activate auto daylight time 
+#define DST_LOCAL 1
 
 #define MAX_WAIT_TIME_WIFI 60000
 #define MAX_ATTEMPT_WIFI 100
@@ -50,8 +56,8 @@ bool syncWifiInit(const char *ssid, const char *passphrase = (const char *)__nul
 }
 
 const char *ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 3600;
-const int daylightOffset_sec = 3600;
+const long gmtOffset_sec = GMT_LOCAL * 3600;
+const int daylightOffset_sec = DST_LOCAL * 3600;
 
 uint32_t getNTP(void)
 {
@@ -199,6 +205,40 @@ void addEvent(eventTimer *eventList, uint8_t *nEvent,
     (*nEvent)++;
 
     Serial.printf("Événement ajouté avec ID %d, time: %d, period: %d\n",GET_EVENT_TIMER_ID(newEvent.flags), time, period);
+}
+
+
+#define SDCARD_CHIPSELECT 2
+
+bool syncSDCardInit(uint8_t chipSelectPin) {
+
+    Serial.println("Access to SD card");
+
+    pinMode(chipSelectPin, OUTPUT);
+
+    if (!SD.begin(chipSelectPin)) {
+        Serial.println("Error Cannot access to SD Card");
+        return false;
+    }
+
+    if (SD.cardType() == CARD_NONE) {
+        Serial.println("Error Wrong");
+        return false;
+    }
+    Serial.print("\tCard type : \t");
+    switch (SD.cardType()) {
+        case CARD_MMC: Serial.println("MMC"); break;
+        case CARD_SD: Serial.println("SDSC"); break;
+        case CARD_SDHC: Serial.println("SDHC"); break;
+        default: Serial.println("Unknown");
+    }
+
+    uint64_t cardSize = SD.cardSize() >> 20;
+    Serial.print("\t Card capacity : \t");
+    Serial.print(cardSize);
+    Serial.println(" Mo");
+
+    return true;
 }
 
 #endif // SYNC_H

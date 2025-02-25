@@ -21,7 +21,8 @@ public: // TODO getter and setter
     Module moduleList[MAX_MODULES];
     SemaphoreHandle_t xMutex_NotifyAll;
 
-    void *sharedRessources[MAX_SHARED_RESOURCES];
+    // void *sharedRessources[MAX_SHARED_RESOURCES];
+    protected_data_t * sharedRessources[MAX_SHARED_RESOURCES];
     uint8_t nSharedResource;
 
     uint32_t joinList[MAX_JOIN_LIST] = {0}; // TODO : add more module (use uint32_t but due to splitting 32 bit to Module and SharedResource ... see NOTIFY_MSG uses)
@@ -126,7 +127,8 @@ public: // TODO getter and setter
             while (1)
                 ;
         }
-        createSharedResource(&this->sharedRessources[this->nSharedResource], data.mutex, data.data);
+        // createSharedResource(&this->sharedRessources[this->nSharedResource], data.mutex, data.data);
+        createSharedResource((void **)&this->sharedRessources[this->nSharedResource], data.mutex, data.data);
         return this->nSharedResource++;
     }
 
@@ -418,6 +420,20 @@ public: // TODO getter and setter
             TODO get relationship ... maybe impossible due to late execution
              modulePtr->lastEvents->lastTimer ~~ CURRENT_EPOCH + MILLIS_TO_EPOCH((pdTICKS_TO_MILLIS(modulePtr->lastAwake))) (without preemption)
         */
+    }
+
+    bool lock(uint8_t protectedRessourceIndex, uint32_t delay = MAX_DELAY){
+        return lockProtected((protected_data_t*)&sharedRessources[protectedRessourceIndex],delay);
+    }
+    bool unlock(uint8_t protectedRessourceIndex){
+        return unlockProtected((protected_data_t*)&sharedRessources[protectedRessourceIndex]);
+    }
+
+    static SRTL& GetCurrentInstance(Module * modulePtr){
+        if (!modulePtr || !modulePtr->parent) {
+            throw std::runtime_error("Module or parent is null");
+        }
+        return *(modulePtr->parent);
     }
 
 };

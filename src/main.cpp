@@ -1568,7 +1568,8 @@ void eventTest(void *modulePtr)
 
 
 		if(eventID == 10)
-			GET_SRTL_INSTANCE.notifyModule(GET_CURRENT_MODULE_INDEX + 1,INDEX_TO_BITSET(GET_CURRENT_MODULE_INDEX),0,eSetBits);
+			SRTL::GetCurrentInstance(currentModule).notifyModule(GET_CURRENT_MODULE_INDEX + 1,INDEX_TO_BITSET(GET_CURRENT_MODULE_INDEX),0,eSetBits);
+			// GET_SRTL_INSTANCE.notifyModule(GET_CURRENT_MODULE_INDEX + 1,INDEX_TO_BITSET(GET_CURRENT_MODULE_INDEX),0,eSetBits);
 
 		
 		}
@@ -1617,13 +1618,36 @@ void eventTestReceiver(void *modulePtr){
 
 		if (xTaskNotifyWait(0xFFFFFFFF, 0xFFFFFFFF, &currentModule->notificationValue, portMAX_DELAY)){
 			if(EXTRACT_SOURCE_MODULE(currentModule->notificationValue) == INDEX_TO_BITSET((GET_CURRENT_MODULE_INDEX - 1))){
-				Serial.printf("\n Event Receive !!!!!!!!!!!!!! \n");
+				Serial.println("\nEvent Receive\n");
 			}
 		}
 
+	moduleSleep(currentModule);
 	}
 
+}
+
+void pwmTask(void *modulePtr){
+	Module * currentModule = ((Module *)modulePtr);
+
+	const int pwmChannel = 0;  // Canal PWM (ESP32 supporte plusieurs canaux)
+	const int pwmFreq = 300;  // Fréquence du signal PWM en Hz
+	const int pwmResolution = 6;  // Résolution du signal PWM (6 bits = 64 niveaux)
+	const int pwmPin = 4;  // GPIO sur lequel on génère le signal PWM
+	int duty = 63;
+
+	ledcSetup(pwmChannel, pwmFreq, pwmResolution);
+	ledcAttachPin(pwmPin, pwmChannel);
+	ledcWrite(pwmChannel, duty); 
+
+
+	for(;;){
+	// duty = (duty+4)% ((1<<pwmResolution)+4);
+	// ledcWrite(pwmChannel, duty); 
+	// Serial.println(duty);
 	vTaskDelay(pdMS_TO_TICKS(currentModule->taskFrequency));
+	}
+
 }
 
 // TEST
@@ -1729,7 +1753,11 @@ void setup()
 
 	// TEST EVENT
 	srtl.registerModule(eventTest, "Event", MINIMAL_STACK_SIZE * 2, 5, 0, 1, NULL);
-	srtl.registerModule(eventTestReceiver, "Event Receiver",MINIMAL_STACK_SIZE * 2, 5, 0, 1, NULL);
+	srtl.registerModule(eventTestReceiver, "Event Receiver",MINIMAL_STACK_SIZE * 2, 5, 0, 999, NULL);
+
+
+	// PWM
+	srtl.registerModule(pwmTask, "PWM",MINIMAL_STACK_SIZE, 5, 0, 500, NULL);
 
 	// JOIN
 

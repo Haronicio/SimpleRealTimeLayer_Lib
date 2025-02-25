@@ -236,6 +236,26 @@ inline void createSharedResource(void **resource, SemaphoreHandle_t *mutex, void
     }
 
 }
+
+inline void moduleSleep(Module * currentModule){
+    vTaskDelay(pdMS_TO_TICKS(currentModule->taskFrequency));
+}
+
+inline void moduleEnd(Module * currentModule){
+    vTaskDelete(NULL);
+}
+
+#define MAX_DELAY (pdTICKS_TO_MS(portMAX_DELAY))
+
+inline bool lockProtected(protected_data_t * pdata,uint32_t delay){
+    return xSemaphoreTake(*pdata->mutex, pdMS_TO_TICKS(delay));
+}
+
+inline bool unlockProtected(protected_data_t * pdata){
+    return xSemaphoreGive(*pdata->mutex);
+}
+
+
 #ifdef C_ONLY
 /**
  * @brief Enregistre une ressource partagée dans la liste des ressources.
