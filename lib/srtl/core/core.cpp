@@ -1,5 +1,10 @@
 
 // #define C_ONLY
+#include "core.h"
+
+uint8_t nSemaphoreMutexBuffer = 0;
+StaticSemaphore_t semaphoreMutexBufferList[MAX_SEMAPHORE_MUTEX] = {NULL};
+char binaryBuffer[33];
 
 #ifdef C_ONLY
 #include "core.h"

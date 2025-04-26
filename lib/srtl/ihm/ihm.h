@@ -47,7 +47,8 @@ static inline void createController(void (*digitalHandler)(void*), PinController
         for (uint8_t i = 0; i < MAX_ANALOGPIN_IN_CONTROLLER; i++)
             controller->analogPinStates[i] = 0;
 
-        for (uint8_t i = 0; (i < MAX_DIGITALPIN_IN_CONTROLLER) && (digitalPins[i].pin != 0); i++)
+        //TODO Warning checking for pin 0, checking for pin = NULL instead (checking for ISRmode instead ?)
+        for (uint8_t i = 0; (i < MAX_DIGITALPIN_IN_CONTROLLER) && (digitalPins[i].ISRmode != 0); i++)
         {
             pinMode(digitalPins[i].pin, digitalPins[i].READmode);
             attachInterruptArg(digitalPinToInterrupt(digitalPins[i].pin), digitalHandler, controller, digitalPins[i].ISRmode);

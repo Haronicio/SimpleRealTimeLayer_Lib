@@ -27,8 +27,12 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/semphr.h>
+// #include <stdatomic.h>
+#include <atomic>
 
-#include "sync/sync.h"
+
+// #include "../sync/sync.h"
+typedef struct eventTimer eventTimer;
 
 //forward declaration of struct SRTL
 struct SRTL;
@@ -79,21 +83,24 @@ struct SRTL;
 // MACRO Divers
 #define ARRAY_INDEX_FROM_PTR(array, element_ptr) ((element_ptr) - (&array[0]))
 
-char binaryBuffer[33];
+extern char binaryBuffer[33];
 #define TO_BIN(value) (itoa((value), binaryBuffer, 2))
 
-#define INDEX_TO_BITSET(index) ((1 << (index)))
+#define INDEX_TO_BITSET(index) ((1U << (index)))
+
 
 // MACRO INSIDE MODULE HANDLER
 
 #define GET_SRTL_INSTANCE ((*((Module *)modulePtr)->parent))
 #define GET_PARAMS_INSTANCE(type) (*(type *)(((Module *)modulePtr)->parameters))
+#define GET_PARAMS(type) ((type *)(((Module *)modulePtr)->parameters))
 #define GET_CURRENT_MODULE_INSTANCE (*((Module *)modulePtr))
 #define GET_CURRENT_MODULE_INDEX (ARRAY_INDEX_FROM_PTR(GET_SRTL_INSTANCE.moduleList, (Module *)modulePtr))
 
 // #ifdef __cplusplus
 // extern "C" {
 // #endif
+
 
 // Module struct (task with some information) (compatibles C et C++)
 typedef struct
@@ -103,7 +110,8 @@ typedef struct
     uint32_t taskFrequency;       // Fréquence d'exécution de la tâche (< 1000 ms)
     uint32_t notificationValue;   // Valeur de notification
     TickType_t lastAwake;         // Pour la gestion de réveil précis (autoTimer voir sync.h)
-    eventTimer *lastEvent;        // Guarder la ref du dernier évènements
+    std::atomic_bool abort_requested; // Pour l'abandon de réveil précis (autoTimer voir sync.h)
+    struct eventTimer *lastEvent;        // Guarder la ref du dernier évènements
     void *parameters;             // Paramètres de la tâche
 #ifndef C_ONLY
     struct SRTL *parent; // Pointeur vers l'objet SRTL parent, attention forward declaration
@@ -154,6 +162,7 @@ static inline void createModule(TaskFunction_t taskFunction, const char *name, u
     module->taskFrequency = taskFrequency;
     module->parameters = moduleparameters;
     module->lastAwake = xTaskGetTickCount();
+    module->abort_requested.store(false);
     module->lastEvent = NULL;
 
     // moduleparameters in module, module adress in taskhandler parameters
@@ -199,15 +208,14 @@ static inline uint8_t registerModule(TaskFunction_t taskFunction, const char *na
 #endif
 
 #define MAX_SEMAPHORE_MUTEX 16
-uint8_t nSemaphoreMutexBuffer = 0;
-StaticSemaphore_t semaphoreMutexBufferList[MAX_SEMAPHORE_MUTEX] = {NULL};
+// uint8_t nSemaphoreMutexBuffer = 0;
+// StaticSemaphore_t semaphoreMutexBufferList[MAX_SEMAPHORE_MUTEX] = {NULL};
+extern uint8_t nSemaphoreMutexBuffer;
+extern StaticSemaphore_t semaphoreMutexBufferList[MAX_SEMAPHORE_MUTEX];
 
-/**
- * @brief Crée une ressource partagée dans le système.
- * @param resource Pointeur vers la ressource partagée.
- * @param mutex Mutex pour la ressource.
- * @param valueLocation Adresse de la ressource.
- */
+// ERROR : Cette ancienne version de createSharedResource était générique et ne prenait pas en compte
+// qu'une ressource partagé avait un champ data et mutex
+/*
 inline void createSharedResource(void **resource, SemaphoreHandle_t *mutex, void *valueLocation)
 {
     if (resource == NULL || mutex == NULL)
@@ -222,7 +230,7 @@ inline void createSharedResource(void **resource, SemaphoreHandle_t *mutex, void
         while (1)
             ;
     }
-
+    // ERROR : ATTENTION GROS PROBLEME ICI INCOMPATIBLE AVEC LA NOUVELLE DEFINITION DE SHAREDRESSOURCES (void* -> protected_data_t)
     *resource = valueLocation;
     // version statique
     *mutex = xSemaphoreCreateMutexStatic(&semaphoreMutexBufferList[nSemaphoreMutexBuffer++]);
@@ -235,6 +243,45 @@ inline void createSharedResource(void **resource, SemaphoreHandle_t *mutex, void
             ;
     }
 
+}
+    */
+/**
+ * @brief Crée une ressource partagée dans le système.
+ * @param resource Pointeur vers le conteneur de la ressource partagée.
+ * @param mutex Mutex pour la ressource.
+ * @param valueLocation Adresse de la ressource.
+ */
+inline void createSharedResource(protected_data_t **resource, SemaphoreHandle_t *mutex, protected_data_t* valueLocation)
+{
+    if (resource == NULL || mutex == NULL || valueLocation == NULL)
+    {
+        Serial.println("Invalid arguments to createSharedResource");
+        while (1)
+            ;
+    }
+    if (nSemaphoreMutexBuffer >= MAX_SEMAPHORE_MUTEX)
+    {
+        Serial.println("Semaphore buffer exhausted");
+        while (1)
+            ;
+    }
+
+    // on s'assure que c'est bien le bon mutex
+    assert(valueLocation->mutex == mutex);
+
+    // protected data rentre dans son tableau de référencement
+    *resource = valueLocation;
+    
+    // version statique
+    *mutex = xSemaphoreCreateMutexStatic(&semaphoreMutexBufferList[nSemaphoreMutexBuffer++]);
+    // *mutex = xSemaphoreCreateMutex(); // version dynamique
+
+    if (*mutex == NULL)
+    {
+        Serial.println("Failed to create mutex for resource");
+        while (1)
+            ;
+    }
 }
 
 inline void moduleSleep(Module * currentModule){

@@ -19,6 +19,27 @@ cd C:\Users\haron\.platformio\packages\toolchain-xtensa-esp32\bin
 .\xtensa-esp32-elf-addr2line -pfiaC -e "C:\Users\haron\Documents\PlatformIO\Projects\SimpleRealTimeLayer_Lib\.pio\build\esp32doit-devkit-v1\firmware.elf" backtrace
 */
 
+
+/*
+		IMPORTANT :
+
+		En étudiant ma librairie via mon projet ControlEnvironnement je me suis rendu compte que la taille des éléments du tableau sharedRessources étaient
+		inconsistant créant ainsi  une fuite de mémoire
+		En effet, dans la première version de createSharedRessource dans core.h, le système était concu pour enregistré
+		des éléments générique dans le tableau, peut à peut j'ai switché vers des protected_data_t, hors les précédente logique
+		faisait cotoyer dans sharedRessource des char int float et protected_data causant un corruption des mutexs par débordement
+		la solution est simple : une ressource partagé est par définition faites pour être protégée, on manipule donc des protected_data_t
+		registerSharedRessource utilise des référence sur un protected_data_t pour ne pas rendre obsolète les anciennes implém
+		createSharedRessource avait l'idée d'enregistré dans **ressource (un tableau quelquonque pour référencé toutes les ressources partagées)
+		NOTE : les fautes d'orthographe rend les choses plus confuse !
+		enfin data n'est pas une donnée générique ! ba oui un protected_data_t contient une donnée générique sous forme d'adresse !
+		donc data est un protected_data, son adresse pointe sur la place alloué dans ressource 
+		pour le mutexe êtant donné qu'il est accroché à (protected)data, pas besoin de réassignement mais un assert suffit à s'assurer de la
+		consistance 
+		Finalement on respecte toujours le C vs C++
+
+*/
+
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
 {
 	log_e("Stack overflow in task: %s\n", pcTaskName);
@@ -1359,7 +1380,7 @@ void cubeTask(void *modulePtr)
 			memcpy(cubeProjected.projectedVertcices, projectedVertices, sizeof(int) * 8 * 2);
 			// Utilisation bancale de notify, mettre directement l'index n'est pas génant mais peut override les bits des autres modules qui notifie
 			// params contient l'id de la ressource partagé
-			GET_SRTL_INSTANCE.notifyMonitor(GET_CURRENT_MODULE_INDEX, GET_PARAMS_INSTANCE(int), eSetBits);
+			GET_SRTL_INSTANCE.notifyMonitor(GET_CURRENT_MODULE_INDEX, GET_PARAMS_INSTANCE(uint8_t), eSetBits);
 			xSemaphoreGive(xMutex_CubeProj);
 		}
 		vTaskDelay(pdMS_TO_TICKS(25));
